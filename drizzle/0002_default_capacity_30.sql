@@ -1,0 +1,1 @@
+INSERT INTO settings (id, default_capacity, updated_at) VALUES (1, 30, CAST(strftime('%s', 'now') AS INTEGER) * 1000) ON CONFLICT(id) DO UPDATE SET default_capacity=30, updated_at=excluded.updated_at;
