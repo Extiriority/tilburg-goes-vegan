@@ -67,6 +67,15 @@ it('normalizes email and prevents a second active registration',async()=>{
   expect(await n('registration_tokens')).toBe(1);
 });
 
+it('does not let a new signup jump an eligible waiting-list participant',async()=>{
+  await db.prepare("UPDATE events SET capacity=1 WHERE id='e'").run();
+  const first=await register(db,secret,await input('first@example.invalid'),now);
+  await register(db,secret,await input('waiting@example.invalid'),now);
+  await changeRegistration(db,first.token,'cancel',0,undefined,now);
+  const newcomer=await register(db,secret,await input('new@example.invalid'),now);
+  expect(newcomer.registration.status).toBe('waiting_list');
+});
+
 it('does not confirm an existing undecided place before its opening date',async()=>{
   const original=await register(db,secret,await input('legacy@example.invalid','guest',true),now);
   const starts=Date.parse('2026-11-23T18:00:00Z');

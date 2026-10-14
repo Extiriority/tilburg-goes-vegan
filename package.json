@@ -17,7 +17,9 @@
     "prepare": "svelte-kit sync",
     "db:setup:local": "node --experimental-strip-types scripts/setup-local.mjs",
     "privacy:cleanup:local": "node --experimental-strip-types scripts/cleanup-local.mjs",
-    "privacy:watch:local": "node --experimental-strip-types scripts/cleanup-local.mjs --watch"
+    "privacy:watch:local": "node --experimental-strip-types scripts/cleanup-local.mjs --watch",
+    "operations:run:local": "node --experimental-strip-types scripts/operations-local.mjs",
+    "operations:watch:local": "node --experimental-strip-types scripts/operations-local.mjs --watch"
   },
   "dependencies": {
     "@fontsource-variable/fredoka": "^5.3.0",

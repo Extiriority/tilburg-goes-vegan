@@ -1,5 +1,7 @@
 # Implementation plan
 
+Local meal allocation and automatic waiting-list promotion through Sunday are implemented, with atomic notification intents and a combined privacy/waiting-list watcher. Authenticated Monday contacted-person promotion, email delivery and production scheduling remain subsequent gates. See WAITING_LIST.md.
+
 The two-gathering registration window is enforced server-side with Amsterdam midnight opening dates and visible bilingual date notices. No cron or database migration is needed for opening; the next request evaluates the current time.
 
 Local privacy cleanup is implemented and tested, with once-only and minute-watch commands. Production Cron integration, backup restore gating and mailbox/Excel procedures remain launch gates. See PRIVACY_CLEANUP.md.

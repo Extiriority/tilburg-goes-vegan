@@ -2,6 +2,8 @@
 
 Version 1.0 | 14 October 2026
 
+Meal-allocation decision: freeze the confirmed participant count, including confirmed volunteers, at the Saturday 16:00 cutoff. Undecided and waiting-list participants reserve no meal. Local automatic FIFO promotion through Sunday is implemented within this ceiling; Monday manual actions and production scheduling remain pending. See WAITING_LIST.md.
+
 Registration-window amendment: only the next two gatherings accept new public registrations. Later gray gatherings open at 00:00 Europe/Amsterdam on the day after the occurrence two dinners earlier (23 November opens 27 October; 7 December opens 10 November). This supersedes the earlier statement that gray styling adds no opening restriction. Saturday cutoff, cancellations and role/capacity rules still apply. Existing registrations are preserved; undecided confirmations also respect opening dates.
 
 Retention amendment: “one/seven days after the gathering” means elapsed +24 hours / +7×24 hours from scheduled dinner end, also for cancelled gatherings. Local cleanup deletes participant rows and linked credentials/email intents rather than retaining potentially linkable histories. See PRIVACY_CLEANUP.md; production scheduling remains pending.

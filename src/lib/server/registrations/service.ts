@@ -1,6 +1,7 @@
 import { hashToken, managementToken, verifySubmissionToken } from './tokens';
 import type { RegistrationInput, DetailsInput } from './validation';
 import { localInstant, TIMEZONE, registrationOpensAt } from '../events/schedule';
+import { freezeMealAllocation } from '../events/waiting-list';
 
 const DAY = 86_400_000;
 // UTC seconds suffice for the whole-second Amsterdam deadlines; use DB time
@@ -70,6 +71,8 @@ export async function register(db: D1Database, secret: string, input: Registrati
       db.prepare(`INSERT INTO registrations
         (id,event_id,email_normalized,full_name,role,status,language,dietary_notes,dietary_consent_at,comments,created_at,updated_at)
         SELECT ?,e.id,?,?,?,CASE WHEN ? THEN 'undecided'
+          WHEN EXISTS (SELECT 1 FROM registrations w WHERE w.event_id=e.id AND w.status='waiting_list' AND w.anonymized_at IS NULL
+            AND (w.role='guest' OR (SELECT count(*) FROM registrations WHERE event_id=e.id AND status='confirmed' AND role=w.role)<3)) THEN 'waiting_list'
           WHEN (SELECT count(*) FROM registrations WHERE event_id=e.id AND status='confirmed') >= e.capacity
             OR (e.meal_allocation IS NOT NULL AND (SELECT count(*) FROM registrations WHERE event_id=e.id AND status='confirmed') >= e.meal_allocation)
             OR (? IN ('chef','helper_chef') AND (SELECT count(*) FROM registrations WHERE event_id=e.id AND status='confirmed' AND role=?) >= 3)
@@ -104,23 +107,30 @@ export async function changeRegistration(db: D1Database, token: string, action: 
   if (action==='confirm' && current.status!=='undecided') throw new RegistrationError('invalid_transition');
   if (action==='confirm' && now>=current.registration_cutoff) throw new RegistrationError('closed');
   if (action==='confirm' && now<registrationOpensAt(current.starts_at)) throw new RegistrationError('not_open');
+  if (action==='confirm' && await db.prepare(`SELECT 1 FROM registrations w WHERE w.event_id=? AND w.status='waiting_list' AND w.anonymized_at IS NULL
+    AND (w.role='guest' OR (SELECT count(*) FROM registrations WHERE event_id=w.event_id AND status='confirmed' AND role=w.role)<3) LIMIT 1`)
+    .bind(current.event_id).first()) throw new RegistrationError('full');
   const nextVersion=expectedVersion+1;
   const tokenHash=await hashToken(token);
   const validToken=`AND EXISTS (SELECT 1 FROM registration_tokens WHERE registration_id=registrations.id AND token_hash=? AND revoked_at IS NULL AND expires_at>MAX(?,${SQL_NOW}))`;
   const update = action==='details'
     ? db.prepare(`UPDATE registrations SET dietary_notes=?,dietary_consent_at=?,comments=?,version=version+1,updated_at=?
-        WHERE id=? AND version=? AND status<>'cancelled' AND EXISTS (SELECT 1 FROM events WHERE id=event_id AND status='scheduled' AND ends_at>MAX(?,${SQL_NOW})) ${validToken}`)
+        WHERE id=? AND version=? AND status<>'cancelled' AND EXISTS (SELECT 1 FROM events WHERE id=event_id AND status='scheduled' AND ends_at>MAX(?,${SQL_NOW})
+          AND (registration_cutoff>${SQL_NOW} OR meal_allocation IS NOT NULL)) ${validToken}`)
       .bind(details!.dietaryNotes,details!.dietaryNotes?now:null,details!.comments,now,current.id,expectedVersion,now,tokenHash,now)
     : db.prepare(`UPDATE registrations SET status=?,version=version+1,updated_at=? WHERE id=? AND version=? AND status=?
         AND EXISTS (SELECT 1 FROM events WHERE id=event_id AND ends_at>MAX(?,${SQL_NOW})
-          ${action==='confirm'?`AND status='scheduled' AND registration_cutoff>MAX(?,${SQL_NOW}) AND starts_at=? AND ?<=MIN(?,${SQL_NOW})`:''}) ${validToken}`)
+          AND (status='cancelled' OR registration_cutoff>${SQL_NOW} OR meal_allocation IS NOT NULL)
+          ${action==='confirm'?`AND status='scheduled' AND registration_cutoff>MAX(?,${SQL_NOW}) AND starts_at=? AND ?<=MIN(?,${SQL_NOW})
+            AND NOT EXISTS (SELECT 1 FROM registrations w WHERE w.event_id=events.id AND w.status='waiting_list' AND w.anonymized_at IS NULL
+              AND (w.role='guest' OR (SELECT count(*) FROM registrations WHERE event_id=events.id AND status='confirmed' AND role=w.role)<3))`:''}) ${validToken}`)
       .bind(action==='cancel'?'cancelled':'confirmed',now,current.id,expectedVersion,current.status,now,...(action==='confirm'?[now,current.starts_at,registrationOpensAt(current.starts_at),now]:[]),tokenHash,now);
   const key=`registration:${current.id}:${action}:${nextVersion}`;
   // The CHECK makes an unsuccessful conditional update abort the entire batch,
   // preventing a racing request from queuing an email for somebody else's update.
   const receipt=db.prepare(`INSERT INTO registration_mutations (id,registration_id,version,action,applied,created_at)
     VALUES (?,?,?,?,changes(),?)`).bind(crypto.randomUUID(),current.id,nextVersion,action,now);
-  const statements=[update,receipt,emailIntent(db,crypto.randomUUID(),key,`'registration_${action}'`,now,nextVersion)];
+  const statements=[freezeMealAllocation(db,current.event_id,now),update,receipt,emailIntent(db,crypto.randomUUID(),key,`'registration_${action}'`,now,nextVersion)];
   if (action==='cancel') statements.push(organizerIntents(db,current.id,key+':organizer','volunteer_cancellation',now,"r.role IN ('chef','helper_chef')",nextVersion));
   if (action==='confirm') statements.push(organizerIntents(db,current.id,key+':organizer','volunteer_signup',now,"r.role IN ('chef','helper_chef')",nextVersion));
   if (action==='details' && current.dietary_notes!==details!.dietaryNotes) statements.push(organizerIntents(db,current.id,key+':organizer','late_dietary_change',now,`e.registration_cutoff<=${now}`,nextVersion));
@@ -129,7 +139,7 @@ export async function changeRegistration(db: D1Database, token: string, action: 
   if (action==='cancel' && current.status==='confirmed' && now>=eventDayStarts && now<current.starts_at) statements.push(organizerIntents(db,current.id,key+':vacancy','vacancy',now,'1=1',nextVersion));
   try {
     const results=await db.batch(statements);
-    if (results[0].meta.changes!==1) throw new RegistrationError('conflict');
+    if (results[1].meta.changes!==1) throw new RegistrationError('conflict');
   } catch (error) {
     if (String(error).includes('registration_capacity_exceeded')) throw new RegistrationError('full');
     if (String(error).includes('mutation_applied') || String(error).includes('registration_mutations.registration_id')) throw new RegistrationError('conflict');

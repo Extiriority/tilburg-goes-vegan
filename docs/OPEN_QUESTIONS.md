@@ -1,5 +1,7 @@
 # Items requiring organizer or technical confirmation
 
+Resolved meal-allocation algorithm: confirmed participants at Saturday cutoff, including volunteers. FIFO promotion selects the earliest role-eligible participant, with ID as a deterministic timestamp tie-breaker. Monday organizer UI/contacted-person confirmation remains to implement. See WAITING_LIST.md.
+
 Resolved retention anchor: scheduled dinner end, elapsed UTC +24 hours / +7×24 hours, including cancelled gatherings. See PRIVACY_CLEANUP.md.
 
  additional organizer recipients; approved WhatsApp invite URL; official privacy-controller contact details; SMTP configuration; exact meal-allocation algorithm and Monday vacancy handling; detailed cancellation-event edge cases; domain and deployment credentials.

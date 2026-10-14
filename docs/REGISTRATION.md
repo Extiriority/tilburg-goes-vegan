@@ -10,6 +10,8 @@
 
 ## Implemented slice
 
+Waiting-list amendment: post-cutoff edits/cancellations now freeze the confirmed-at-cutoff meal snapshot before changing a registration. Local operations automatically promote eligible waiting-list participants through Sunday and queue notification intents; new signups/undecided confirmation cannot jump eligible waiting-list participants. See WAITING_LIST.md for the runner and remaining Monday/admin gates.
+
 Homepage registration uses a SvelteKit action and Zod validation, localized field errors, full name/email/role, optional dietary notes and comments, and separate explicit dietary consent. Trim/lowercase email normalization matches the database constraint. Optional text is limited to 2,000 characters; name to 160 and email to 254. No group bookings, payments, participant accounts or course selection.
 
 The single INSERT SELECT decides confirmed/undecided/waiting_list while D1 serializes the write; existing database triggers enforce total capacity, both three-person volunteer limits and any fixed meal ceiling. Event status and Saturday cutoff are checked in the write using both request time and database time. Registration, token-hash row and deduplicated participant/organizer email intents commit as one batch. Missing/cancelled/closed events cannot create orphan email intents.

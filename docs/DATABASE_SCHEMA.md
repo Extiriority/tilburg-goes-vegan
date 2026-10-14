@@ -1,5 +1,7 @@
 # Database design
 
+Meal allocation is confirmed as the Saturday-cutoff confirmed count. The existing `events.meal_allocation` field stores the one-time snapshot; cancellation/edit services freeze it before post-cutoff writes, and existing capacity triggers enforce the ceiling. No new migration is needed. See WAITING_LIST.md.
+
 Retention interpretation is now confirmed: elapsed UTC +24 hours and +7×24 hours from scheduled dinner end. Cleanup uses existing tables and foreign-key cascades; no new migration is needed. Participant rows are deleted, with only non-identifying cleanup counts retained. See PRIVACY_CLEANUP.md.
 
 Registration increment adds `registration_mutations` in `0004_living_micromax.sql`. Unique registration/version receipts and an applied-row CHECK ensure failed conditional edits roll back the entire D1 batch, including emails. Existing registrations, token rows and outbox schemas remain compatible. See REGISTRATION.md.

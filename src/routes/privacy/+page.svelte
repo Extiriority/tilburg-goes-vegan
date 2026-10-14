@@ -5,7 +5,12 @@
   let nl = $derived($locale === 'nl');
   let t = $derived(siteCopy[$locale]);
 </script>
-<svelte:head><title>{t.privacy} — Tilburg Goes Vegan</title><meta name="robots" content="noindex" /></svelte:head>
+
+<svelte:head>
+  <title>{t.privacy} — Tilburg Goes Vegan</title>
+  <meta name="robots" content="noindex" />
+</svelte:head>
+
 <main class="page-width privacy-page">
   <a href="/" data-sveltekit-preload-code="eager">← Tilburg Goes Vegan</a>
   <h1 class="section-title" style="margin-top: 36px">{t.privacy}</h1>

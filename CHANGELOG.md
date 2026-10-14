@@ -2,6 +2,11 @@
 
 ## 2026-10-14
 
+- Confirmed Saturday meal allocation equals confirmed participants, including volunteers. Added one-time snapshots before post-cutoff edits/cancellations and atomic FIFO waiting-list promotions constrained by role, capacity, opening time, meal ceiling and Monday midnight.
+- Added a combined local privacy/waiting-list operations runner with queued participant/volunteer promotion intents. Email delivery, Monday authenticated manual actions and production cron remain pending; nothing deployed. Local verification changed no records.
+- Limited simultaneous test runtimes to two after Windows Workers startup timeouts; concurrent capacity/promotion assertions remain concurrent within their tests.
+- Waiting-list validation: all 51 tests pass, including an exact cutoff-crossing cancellation retry, FIFO eligibility, meal ceilings, concurrent promotion and outbox rollback. Type checks are clean.
+
 - Limited registration to the next two gatherings. Gray dates show opening dates and remain disabled until 00:00 Amsterdam after the dinner two occurrences earlier. Server writes recheck opening against both request/database clocks and the event timestamp; undecided confirmation also respects the window. Existing registrations are retained.
 
 - Implemented local privacy cleanup: dietary/consent purge at scheduled dinner end +24 hours and participant/linked token, receipt and email deletion at +7×24 hours, including cancelled events. Added local-only one-shot and minute-watch commands; no production cron or deployment.
