@@ -1,5 +1,9 @@
 # Database design
 
+Migration 0018 adds recipes.allergens, a JSON array of canonical allergen IDs (default []). Server validation rejects unknown IDs and canonicalizes duplicates before version-checked publication.
+
+Migration 0016 adds recipes.notes (validated numbered-note/target JSON, default []), youtube_video_id (validated video ID), nullable serving_grams and calories_kcal. Existing ordered recipe ingredient/step tables remain unchanged. The server validates reference indices and list limits before atomic publication.
+
 Admin migration `0005_nifty_silver_surfer.sql` adds `admin_login_limits`, non-identifying `admin_write_receipts`, and optimistic recipe versions. Existing event/registration versions and foreign-key/capacity constraints remain in use. `schema.ts` is formatted and grouped by domain; formatting alone produced no schema changes. See ADMIN.md.
 
 Meal allocation is confirmed as the Saturday-cutoff confirmed count. The existing `events.meal_allocation` field stores the one-time snapshot; cancellation/edit services freeze it before post-cutoff writes, and existing capacity triggers enforce the ceiling. No new migration is needed. See WAITING_LIST.md.

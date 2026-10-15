@@ -55,14 +55,8 @@ export async function uploadRecipePhotos(
   thumbnails: File[],
   now = Date.now(),
 ) {
-  if (files.length < 1 || files.length > 8 || thumbnails.length !== files.length)
-    throw new AdminError('Select up to eight photos and wait for conversion');
-  const existing = await db
-    .prepare('SELECT count(*) AS n FROM recipe_media WHERE recipe_id=?')
-    .bind(recipeId)
-    .first<{ n: number }>();
-  if ((existing?.n ?? 0) + files.length > 12)
-    throw new AdminError('A recipe may have up to 12 photos');
+  if (files.length !== 1 || thumbnails.length !== 1)
+    throw new AdminError('Select one photo and wait for conversion');
   const photos = [];
   for (let i = 0; i < files.length; i++) {
     if (files[i].size > 2000000 || thumbnails[i].size > 2000000)
@@ -97,12 +91,14 @@ export async function uploadRecipePhotos(
       db
         .prepare('INSERT INTO admin_write_receipts VALUES (?,changes(),?)')
         .bind(crypto.randomUUID(), now),
-      ...photos.flatMap((p, i) => [
+      db.prepare('DELETE FROM recipe_media WHERE recipe_id=?').bind(recipeId),
+      db.prepare('DELETE FROM dish_media WHERE dish_id=?').bind(`recipe:${recipeId}`),
+      ...photos.flatMap((p) => [
         db
           .prepare(
             "INSERT INTO media_assets (id,r2_key,mime_type,width,height,alt_text,created_at) SELECT ?,?,'image/webp',?,?,title||' — photo '||CAST(? AS INTEGER),? FROM recipes WHERE id=?",
           )
-          .bind(p.id, p.key, p.width, p.height, (existing?.n ?? 0) + i + 1, now, recipeId),
+          .bind(p.id, p.key, p.width, p.height, 1, now, recipeId),
         db
           .prepare(
             'INSERT INTO recipe_media (recipe_id,media_id,position,is_cover) VALUES (?,?,?,?)',
@@ -110,16 +106,16 @@ export async function uploadRecipePhotos(
           .bind(
             recipeId,
             p.id,
-            (existing?.n ?? 0) + i,
-            (existing?.n ?? 0) === 0 && i === 0 ? 1 : 0,
+            0,
+            1,
           ),
         db
           .prepare('INSERT INTO dish_media (dish_id,media_id,position,is_cover) VALUES (?,?,?,?)')
           .bind(
             `recipe:${recipeId}`,
             p.id,
-            (existing?.n ?? 0) + i,
-            (existing?.n ?? 0) === 0 && i === 0 ? 1 : 0,
+            0,
+            1,
           ),
       ]),
     ]);
@@ -127,46 +123,37 @@ export async function uploadRecipePhotos(
     for (const p of photos) await bucket.delete([p.key, p.thumbKey]);
     throw new AdminError('Photos could not be saved. Reload before trying again.');
   }
+  return cleanupUnusedRecipeMedia(db, bucket);
 }
 
-export async function orderRecipePhotos(
-  db: D1Database,
-  recipeId: string,
-  version: number,
-  ordered: string[],
-  cover: string,
-  alts: Record<string, string>,
-  now = Date.now(),
-) {
-  const current = await db
-    .prepare('SELECT media_id FROM recipe_media WHERE recipe_id=?')
-    .bind(recipeId)
-    .all<{ media_id: string }>();
-  if (
-    new Set(ordered).size !== ordered.length ||
-    ordered.length !== current.results.length ||
-    ordered.some((id) => !current.results.some((r) => r.media_id === id)) ||
-    !ordered.includes(cover) ||
-    ordered.some((id) => !alts[id]?.trim() || alts[id].length > 500)
-  )
-    throw new AdminError('Check image order, cover and descriptions');
+/** Keep metadata if object deletion fails, so a later operation can retry cleanup. */
+export async function cleanupUnusedRecipeMedia(db: D1Database, bucket: R2Bucket) {
+  const unused = await db.prepare(`SELECT id,r2_key FROM media_assets m WHERE r2_key LIKE 'recipes/%/full.webp'
+    AND NOT EXISTS(SELECT 1 FROM recipe_media WHERE media_id=m.id)
+    AND NOT EXISTS(SELECT 1 FROM dish_media WHERE media_id=m.id)`).all<{id:string;r2_key:string}>();
+  let pendingCleanup = 0;
+  for (const photo of unused.results) {
+    try {
+      await bucket.delete([photo.r2_key, photo.r2_key.replace(/full\.webp$/, 'thumb.webp')]);
+      await db.prepare(`DELETE FROM media_assets WHERE id=? AND NOT EXISTS(SELECT 1 FROM recipe_media WHERE media_id=media_assets.id) AND NOT EXISTS(SELECT 1 FROM dish_media WHERE media_id=media_assets.id)`).bind(photo.id).run();
+    } catch { pendingCleanup++; }
+  }
+  return { pendingCleanup };
+}
+export async function deleteRecipePhoto(db: D1Database, bucket: R2Bucket, recipeId: string, version: number, now=Date.now()) {
   await db.batch([
-    db
-      .prepare('UPDATE recipes SET version=version+1 WHERE id=? AND version=?')
-      .bind(recipeId, version),
-    db
-      .prepare('INSERT INTO admin_write_receipts VALUES (?,changes(),?)')
-      .bind(crypto.randomUUID(), now),
+    db.prepare('UPDATE recipes SET version=version+1 WHERE id=? AND version=?').bind(recipeId,version),
+    db.prepare('INSERT INTO admin_write_receipts VALUES (?,changes(),?)').bind(crypto.randomUUID(),now),
     db.prepare('DELETE FROM recipe_media WHERE recipe_id=?').bind(recipeId),
     db.prepare('DELETE FROM dish_media WHERE dish_id=?').bind(`recipe:${recipeId}`),
-    ...ordered.flatMap((id, i) => [
-      db.prepare('UPDATE media_assets SET alt_text=? WHERE id=?').bind(alts[id].trim(), id),
-      db
-        .prepare('INSERT INTO recipe_media VALUES (?,?,?,?)')
-        .bind(recipeId, id, i, id === cover ? 1 : 0),
-      db
-        .prepare('INSERT INTO dish_media VALUES (?,?,?,?)')
-        .bind(`recipe:${recipeId}`, id, i, id === cover ? 1 : 0),
-    ]),
+  ]);
+  return cleanupUnusedRecipeMedia(db,bucket);
+}
+export async function describeRecipePhoto(db:D1Database,recipeId:string,version:number,mediaId:string,alt:string,now=Date.now()) {
+  if (!alt.trim() || alt.length>500) throw new AdminError('Check the photo description');
+  await db.batch([
+    db.prepare('UPDATE recipes SET version=version+1 WHERE id=? AND version=? AND EXISTS(SELECT 1 FROM recipe_media WHERE recipe_id=recipes.id AND media_id=?)').bind(recipeId,version,mediaId),
+    db.prepare('INSERT INTO admin_write_receipts VALUES (?,changes(),?)').bind(crypto.randomUUID(),now),
+    db.prepare('UPDATE media_assets SET alt_text=? WHERE id=?').bind(alt.trim(),mediaId),
   ]);
 }

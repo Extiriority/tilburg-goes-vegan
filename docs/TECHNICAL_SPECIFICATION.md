@@ -2,6 +2,8 @@
 
 Version 1.0 | 14 October 2026
 
+16 October recipe photo amendment: one optional image per recipe, automatically used as cover, with replacement, deletion and accessible description editing. This supersedes multiple-image/ordering requirements for recipes. Existing multi-photo recipes remain intact until explicit replacement/deletion. No deployment.
+
 Admin increment: local shared organizer login, editable registration/waiting lists, gathering date/venue/capacity edits and cancellation, contacted-person promotion, and immediate recipe/photo publication are implemented. For special dates, registration always closes on the latest preceding Saturday at 16:00; automatic promotion stops at gathering-day midnight, and contacted-person manual promotion is allowed on that day before 19:00. See ADMIN.md. Production access and password-reset email remain disabled/pending.
 
 Meal-allocation decision: freeze the confirmed participant count, including confirmed volunteers, at the Saturday 16:00 cutoff. Undecided and waiting-list participants reserve no meal. Local automatic FIFO promotion through Sunday is implemented within this ceiling; Monday manual actions and production scheduling remain pending. See WAITING_LIST.md.

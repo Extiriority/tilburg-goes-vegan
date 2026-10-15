@@ -23,7 +23,9 @@ import {
 } from '../src/lib/server/admin/service';
 import {
   uploadRecipePhotos,
-  orderRecipePhotos,
+  deleteRecipePhoto,
+  describeRecipePhoto,
+  cleanupUnusedRecipeMedia,
   webpDimensions,
 } from '../src/lib/server/admin/media';
 import { registrationWindow } from '../src/lib/server/events/window';
@@ -284,6 +286,23 @@ it('publishes recipes with ordered ingredients/steps and rolls back stale update
   );
 });
 
+it('stores linked recipe notes, optional nutrition and a validated tutorial with automatic slugs', async () => {
+  const content = { ingredients: [{ quantity: '100 g', name: 'Tofu' }], steps: ['Drain tofu'], notes: [{ text: 'Press gently', targets: [{ kind: 'ingredient', index: 0 }, { kind: 'step', index: 0 }] }] };
+  const input = recipeEdit.parse({ ...recipeInput(), title: 'Crème & Tofu', slug: 'ignored', content: JSON.stringify(content), youtubeUrl: 'https://youtu.be/abcdefghijk', servingGrams: '250', caloriesKcal: '310', servings: '4', totalMinutes: '45' });
+  input.allergens = ['soy','sesame'];
+  const id = await saveRecipe(db, 'admin', input, clock);
+  expect(await db.prepare('SELECT allergens FROM recipes WHERE id=?').bind(id).first('allergens')).toBe('["soy","sesame"]');
+  const saved = await db.prepare('SELECT slug,notes,youtube_video_id,serving_grams,calories_kcal FROM recipes WHERE id=?').bind(id).first();
+  expect(saved).toEqual({ slug: 'creme-tofu', notes: JSON.stringify(content.notes), youtube_video_id: 'abcdefghijk', serving_grams: 250, calories_kcal: 310 });
+  expect(await db.prepare('SELECT servings,total_minutes FROM recipes WHERE id=?').bind(id).first()).toEqual({ servings: 4, total_minutes: 45 });
+  expect(recipeEdit.safeParse({ ...input, servings: 0 }).success).toBe(false);
+  expect(recipeEdit.safeParse({ ...input, totalMinutes: -1 }).success).toBe(false);
+  await expect(saveRecipe(db, 'admin', { ...input, content: JSON.stringify({ ...content, notes: [{ text: 'Invalid', targets: [{ kind: 'step', index: 8 }] }] }) }, clock)).rejects.toThrow();
+  expect(await count('recipes')).toBe(1);
+  await expect(saveRecipe(db, 'admin', input, clock)).rejects.toThrow();
+  expect(await count('recipe_ingredients')).toBe(1);
+});
+
 it('rolls back gathering edits and venue creation if notification persistence fails', async () => {
   await signup('person');
   const venues = await count('venues');
@@ -359,42 +378,46 @@ it('bases a rescheduled registration window on actual earlier dinners', async ()
   expect((await registrationWindow(db, 'third'))!.opensAt).toBe(Date.parse('2026-10-28T23:00:00Z'));
 });
 
-it('validates WebP metadata, stores variants in local R2, and enforces photo ownership/order', async () => {
-  const bytes = new Uint8Array(
-    Buffer.from('UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEADsD+JaQAA3AAAAAA', 'base64'),
-  );
+it('replaces a single recipe photo, rejects stale writes and deletes both variants safely', async () => {
+  const bytes = new Uint8Array(Buffer.from('UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEADsD+JaQAA3AAAAAA', 'base64'));
   expect(webpDimensions(bytes).width).toBeGreaterThan(0);
   expect(() => webpDimensions(new TextEncoder().encode('<svg></svg>'))).toThrow();
   const recipe = await saveRecipe(db, 'admin', recipeInput(), clock);
   const file = new File([bytes], 'synthetic.webp', { type: 'image/webp' });
-  await uploadRecipePhotos(db, bucket, recipe, 0, [file, file], [file, file], clock);
-  const photos = await db
-    .prepare(
-      'SELECT m.id,m.r2_key FROM media_assets m JOIN recipe_media rm ON rm.media_id=m.id WHERE rm.recipe_id=? ORDER BY position',
-    )
-    .bind(recipe)
-    .all<{ id: string; r2_key: string }>();
-  expect(photos.results).toHaveLength(2);
-  expect(await bucket.get(photos.results[0].r2_key)).toBeTruthy();
-  const ordered = photos.results.map((p) => p.id).reverse();
-  await orderRecipePhotos(
-    db,
-    recipe,
-    1,
-    ordered,
-    ordered[0],
-    Object.fromEntries(ordered.map((id) => [id, 'Synthetic lentil dish'])),
-    clock,
-  );
-  expect(
-    (await db
-      .prepare('SELECT media_id FROM recipe_media WHERE recipe_id=? AND is_cover=1')
-      .bind(recipe)
-      .first())!.media_id,
-  ).toBe(ordered[0]);
-  await expect(
-    orderRecipePhotos(db, recipe, 2, ['foreign-image'], ordered[0], {}, clock),
-  ).rejects.toThrow();
+  await expect(uploadRecipePhotos(db,bucket,recipe,0,[file,file],[file,file],clock)).rejects.toThrow();
+  await uploadRecipePhotos(db,bucket,recipe,0,[file],[file],clock);
+  const first = await db.prepare('SELECT id,r2_key FROM media_assets').first<{id:string;r2_key:string}>();
+  expect(await bucket.get(first!.r2_key)).toBeTruthy();
+  await expect(uploadRecipePhotos(db,bucket,recipe,0,[file],[file],clock)).rejects.toThrow();
+  expect(await bucket.get(first!.r2_key)).toBeTruthy();
+  expect((await bucket.list()).objects).toHaveLength(2);
+  await uploadRecipePhotos(db,bucket,recipe,1,[file],[file],clock);
+  expect(await count('recipe_media')).toBe(1);
+  expect(await count('dish_media')).toBe(1);
+  expect(await count('media_assets')).toBe(1);
+  expect(await bucket.get(first!.r2_key)).toBeNull();
+  const second = await db.prepare('SELECT id,r2_key FROM media_assets').first<{id:string;r2_key:string}>();
+  await expect(describeRecipePhoto(db,recipe,2,'foreign-image','Not mine',clock)).rejects.toThrow();
+  await describeRecipePhoto(db,recipe,2,second!.id,'Synthetic dish',clock);
+  await expect(deleteRecipePhoto(db,bucket,recipe,2,clock)).rejects.toThrow();
+  expect(await count('recipe_media')).toBe(1);
+  await deleteRecipePhoto(db,bucket,recipe,3,clock);
+  expect(await count('recipe_media')).toBe(0);
+  expect(await count('dish_media')).toBe(0);
+  expect(await count('media_assets')).toBe(0);
+  expect((await bucket.list()).objects).toHaveLength(0);
+});
+it('retains cleanup metadata when storage deletion fails and retries it later', async () => {
+  const bytes = new Uint8Array(Buffer.from('UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEADsD+JaQAA3AAAAAA','base64'));
+  const file=new File([bytes],'synthetic.webp',{type:'image/webp'});
+  const recipe=await saveRecipe(db,'admin',recipeInput(),clock);
+  await uploadRecipePhotos(db,bucket,recipe,0,[file],[file],clock);
+  const failing={delete:async()=>{throw new Error('synthetic storage failure');}} as unknown as R2Bucket;
+  expect(await deleteRecipePhoto(db,failing,recipe,1,clock)).toEqual({pendingCleanup:1});
+  expect(await count('recipe_media')).toBe(0);
+  expect(await count('media_assets')).toBe(1);
+  expect(await cleanupUnusedRecipeMedia(db,bucket)).toEqual({pendingCleanup:0});
+  expect(await count('media_assets')).toBe(0);
 });
 
 // Organizer-only walk-ins and absence are tested against real SQLite triggers.

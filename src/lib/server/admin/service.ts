@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { contentSchema, recipeSlug, youtubeId, recipeAllergens } from '../../recipe-content';
 import { localInstant, TIMEZONE } from '../events/schedule';
 import { freezeMealAllocation, mondayStartsAt } from '../events/waiting-list';
 const SQL_NOW = "CAST(strftime('%s','now') AS INTEGER)*1000";
@@ -37,13 +38,20 @@ export function readEventForm(form: FormData) {
 export const recipeEdit = z.object({
   id: z.string().max(100),
   version,
-  slug: text(120).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+  slug: text(120).default(''),
   title: text(200).min(1),
   description: text(4000),
   category: z.enum(['starter', 'main', 'dessert']),
   chefCredit: text(160),
-  ingredients: text(12000).min(1),
-  steps: text(20000).min(1),
+  ingredients: text(12000).default(''),
+  steps: text(20000).default(''),
+  content: z.string().max(100000).optional(),
+  allergens: recipeAllergens.default([]),
+  youtubeUrl: text(500).default('').refine(value => !value || !!youtubeId(value), 'Use a valid HTTPS YouTube video URL'),
+  servingGrams: z.preprocess(v => v === '' || v == null ? null : v, z.coerce.number().int().min(1).max(100000).nullable()).default(null),
+  caloriesKcal: z.preprocess(v => v === '' || v == null ? null : v, z.coerce.number().int().min(0).max(100000).nullable()).default(null),
+  servings: z.preprocess(v => v === '' || v == null ? null : v, z.coerce.number().int().min(1).max(1000).nullable()).default(null),
+  totalMinutes: z.preprocess(v => v === '' || v == null ? null : v, z.coerce.number().int().min(1).max(10080).nullable()).default(null),
 });
 
 export function localInput(timestamp: number) {
@@ -341,7 +349,11 @@ export async function saveRecipe(
   input: z.infer<typeof recipeEdit>,
   now = Date.now(),
 ) {
-  const ingredients = input.ingredients
+  const structured = input.content ? contentSchema.parse(JSON.parse(input.content)) : null;
+  const slug = recipeSlug(input.title);
+  if (!slug) throw new AdminError('Use a title containing letters or numbers');
+  const videoId = youtubeId(input.youtubeUrl);
+  const ingredients = structured?.ingredients ?? input.ingredients
     .split(/\r?\n/)
     .map((s) => s.trim())
     .filter(Boolean)
@@ -350,38 +362,40 @@ export async function saveRecipe(
       if (!name.join('|').trim()) throw new AdminError('Use quantity | ingredient, one per line');
       return { quantity: quantity.trim(), name: name.join('|').trim() };
     });
-  const steps = input.steps
+  const steps = structured?.steps ?? input.steps
     .split(/\r?\n/)
     .map((s) => s.trim())
     .filter(Boolean);
-  if (ingredients.length > 100 || steps.length > 100)
+  if (!ingredients.length || !steps.length || ingredients.length > 100 || steps.length > 100)
     throw new AdminError('Use at most 100 ingredients/steps');
   const recipeId = input.id || crypto.randomUUID();
   const write = input.id
     ? db
         .prepare(
-          'UPDATE recipes SET slug=?,title=?,description=?,category=?,chef_credit=?,version=version+1 WHERE id=? AND version=?',
+          'UPDATE recipes SET slug=?,title=?,description=?,category=?,chef_credit=?,notes=?,youtube_video_id=?,serving_grams=?,calories_kcal=?,servings=?,total_minutes=?,allergens=?,version=version+1 WHERE id=? AND version=?',
         )
         .bind(
-          input.slug,
+          slug,
           input.title,
           input.description || null,
           input.category,
           input.chefCredit || null,
+          JSON.stringify(structured?.notes ?? []), videoId, input.servingGrams, input.caloriesKcal, input.servings, input.totalMinutes, JSON.stringify(input.allergens),
           recipeId,
           input.version,
         )
     : db
         .prepare(
-          'INSERT INTO recipes (id,slug,title,description,category,chef_credit,created_at,published_at) VALUES (?,?,?,?,?,?,?,?)',
+          'INSERT INTO recipes (id,slug,title,description,category,chef_credit,notes,youtube_video_id,serving_grams,calories_kcal,servings,total_minutes,allergens,created_at,published_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
         )
         .bind(
           recipeId,
-          input.slug,
+          slug,
           input.title,
           input.description || null,
           input.category,
           input.chefCredit || null,
+          JSON.stringify(structured?.notes ?? []), videoId, input.servingGrams, input.caloriesKcal, input.servings, input.totalMinutes, JSON.stringify(input.allergens),
           now,
           now,
         );

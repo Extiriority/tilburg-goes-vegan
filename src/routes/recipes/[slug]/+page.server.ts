@@ -1,9 +1,10 @@
 import { error } from '@sveltejs/kit';
+import { readRecipeNotes } from '$lib/recipe-content';
 export const load = async ({ platform, params }: import('./$types').PageServerLoadEvent) => {
   if (!platform?.env.DB) error(404, 'Recipe not found');
   const db = platform.env.DB;
   const recipe = await db
-    .prepare('SELECT title,description,category,chef_credit,id FROM recipes WHERE slug=?')
+    .prepare('SELECT title,description,category,chef_credit,id,notes,youtube_video_id,serving_grams,calories_kcal,servings,total_minutes,allergens FROM recipes WHERE slug=?')
     .bind(params.slug)
     .first<{
       id: string;
@@ -11,6 +12,7 @@ export const load = async ({ platform, params }: import('./$types').PageServerLo
       description: string | null;
       category: string;
       chef_credit: string | null;
+      notes: string; youtube_video_id: string | null; serving_grams: number | null; calories_kcal: number | null; servings: number | null; total_minutes: number | null; allergens: string;
     }>();
   if (!recipe) error(404, 'Recipe not found');
   const ingredients = await db
@@ -29,5 +31,5 @@ export const load = async ({ platform, params }: import('./$types').PageServerLo
     )
     .bind(recipe.id)
     .all<{ id: string; alt_text: string; width: number; height: number }>();
-  return { recipe, ingredients: ingredients.results, steps: steps.results, photos: photos.results };
+  return { recipe, notes: readRecipeNotes(recipe.notes), ingredients: ingredients.results, steps: steps.results, photos: photos.results };
 };

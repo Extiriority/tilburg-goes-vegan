@@ -1,5 +1,43 @@
 # Changelog
 
+- Added optional recipe allergen selection using shared icons/categories, validated storage and possible-allergen chips on public details. Local migration 0018 keeps existing recipes unmarked.
+
+- Added live recipe-photo cropping with zoom and positioning for new or existing images, local 4:3 WebP generation and an explicit apply-before-save flow.
+
+- Simplified recipe photos to one optional image with replace/delete and description editing. Atomic version checks preserve current photos on stale requests; unreferenced variants are cleaned up with retry metadata on storage failure. Legacy photos remain until explicitly replaced/deleted.
+
+- Widened desktop recipe details to a maximum of 1440px, retaining equal columns and mobile stacking.
+
+- Made desktop recipe text and photo/video columns equal in width.
+
+- Moved recipe tutorials into the desktop photo sidebar while keeping them below the steps on mobile, with one opt-in player instance.
+
+- Fixed YouTube error 153 by letting the opt-in tutorial iframe send an origin-only referrer; global private-link referrer protection stays unchanged.
+
+- Strengthened the alternating preparation-row green for clearer separation.
+
+- Moved ingredient note links inline beside ingredient text.
+
+- Tightened ingredient/preparation spacing and added pale alternating step backgrounds while retaining yellow selected-step highlights and 44px tap targets.
+
+- Added ingredient checkboxes with strikethrough, clickable yellow preparation highlights with numbered stamps, hover feedback and a proper Cook Mode toggle. Cooking progress stays local to the page.
+
+- Restyled recipe details with chef credit beside the title, matching servings/time icons, a rounded photo gallery on the right and nutrition at the bottom; mobile stacks the gallery above instructions.
+
+- Rounded public recipe-card corners, clipping cover images to the same curve.
+
+- Added optional serving counts and total minutes to recipe editing, cards and details; existing serving weights also appear on cards. Local migration 0017 preserves unspecified values as empty.
+
+- Added a chef-hat SVG beside chef credits on recipe cards, with a screen-reader label.
+
+- Color-coded recipe course chips: yellow soup bowl for starters, green serving dish for mains, and pink cupcake for desserts, with matching SVG icons and visible text labels.
+
+- Added a bilingual course chip beside each public recipe-card title.
+
+- Redesigned the public recipe listing as two columns of image-led cards, with larger responsive photos and text underneath; cards stack on small screens.
+
+- Rebuilt recipe authoring with growing quantity/ingredient rows, numbered steps and linked notes, automatic slugs, optional serving grams/kcal and a click-to-load YouTube tutorial. Added public Cook Mode and retained optional photo uploads. Local migration 0016 preserves existing recipes.
+
 - Added local Saturday/Sunday reminder queuing with Amsterdam DST handling, deadline guards, concurrent deduplication and privacy cleanup tests. No messages are sent or deployed.
 - Repaired migration history lost with the deleted branch: restored 0014 and Drizzle metadata so fresh databases correctly apply the existing 0015 rollback; the final schema still has no photo-consent field.
 

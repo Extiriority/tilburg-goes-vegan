@@ -1,0 +1,1 @@
+ALTER TABLE `recipes` ADD `allergens` text DEFAULT '[]' NOT NULL;

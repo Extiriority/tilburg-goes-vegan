@@ -1,5 +1,7 @@
 # Privacy and retention
 
+Recipe YouTube tutorials render a local load button first. No YouTube iframe or remote thumbnail loads until the visitor chooses to load the tutorial. The resulting youtube-nocookie.com embed still connects to a third party; the bilingual UI and privacy page explain this.
+
 The local organizer panel is authenticated, no-store and noindex. Admin queries omit identity after +7 days and dietary data after +24 hours even if cleanup is delayed. Dietary notes are view-only; organizer edits do not invent participant consent. Audits record action/event/admin only; no participant text or bearer credentials. Recipe image conversion strips original metadata before optimized variants are uploaded. See ADMIN.md for access and remaining production gates.
 
 Confirmed 14 October 2026: count elapsed UTC time from scheduled dinner end, including cancelled gatherings: +24 hours dietary cleanup and +7×24 hours participant deletion. Local cleanup and an opt-in minute watcher are implemented; production scheduling and external-system deletion remain pending. See PRIVACY_CLEANUP.md.

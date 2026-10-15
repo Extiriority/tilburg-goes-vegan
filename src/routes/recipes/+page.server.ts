@@ -5,7 +5,7 @@ export const load = async ({ platform, url }: import('./$types').PageServerLoadE
     : '';
   const recipes = platform?.env.DB
     ? await platform.env.DB.prepare(
-        `SELECT r.id,r.slug,r.title,r.description,r.category,r.chef_credit,m.id AS cover_id,m.alt_text AS cover_alt FROM recipes r LEFT JOIN recipe_media rm ON rm.recipe_id=r.id AND rm.is_cover=1 LEFT JOIN media_assets m ON m.id=rm.media_id WHERE r.title LIKE ? ${category ? 'AND r.category=?' : ''} ORDER BY r.published_at DESC LIMIT 100`,
+        `SELECT r.id,r.slug,r.title,r.description,r.category,r.chef_credit,r.servings,r.total_minutes,r.serving_grams,m.id AS cover_id,m.alt_text AS cover_alt FROM recipes r LEFT JOIN recipe_media rm ON rm.recipe_id=r.id AND rm.is_cover=1 LEFT JOIN media_assets m ON m.id=rm.media_id WHERE r.title LIKE ? ${category ? 'AND r.category=?' : ''} ORDER BY r.published_at DESC LIMIT 100`,
       )
         .bind(`%${search}%`, ...(category ? [category] : []))
         .all<{
@@ -15,6 +15,7 @@ export const load = async ({ platform, url }: import('./$types').PageServerLoadE
           description: string | null;
           category: string;
           chef_credit: string | null;
+          servings: number | null; total_minutes: number | null; serving_grams: number | null;
           cover_id: string | null;
           cover_alt: string | null;
         }>()

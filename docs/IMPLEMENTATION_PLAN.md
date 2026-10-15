@@ -1,5 +1,7 @@
 # Implementation plan
 
+Recipe editor increment: growing ingredient/preparation/note fields, clickable numbered note references, automatic title slugs, optional grams/kcal and YouTube tutorial, existing optional photo workflow, and public Cook Mode. See RECIPES.md. Local-only; no deployment.
+
 Local scheduled reminder queuing is implemented: Saturday 10:00 undecided and Sunday 18:00 confirmed, with timezone conversion, conditional writes, catch-up limits and per-registration deduplication. The operations runner queues these after cleanup/cutoff cancellation/waiting-list promotion. SMTP transport, rendering, retries and production scheduler remain subsequent slices. See EMAIL_REMINDERS.md.
 
 Local admin increment now covers the shared login, registration/waiting lists with safe edits, gathering editing/cancellation, gathering-day manual promotions and recipe/photo publication. Production auth validation, email/password-reset delivery, R2 provisioning approval and launch operations remain separate gates. See ADMIN.md.
