@@ -1,5 +1,8 @@
 # Changelog
 
+- Added local Saturday/Sunday reminder queuing with Amsterdam DST handling, deadline guards, concurrent deduplication and privacy cleanup tests. No messages are sent or deployed.
+- Repaired migration history lost with the deleted branch: restored 0014 and Drizzle metadata so fresh databases correctly apply the existing 0015 rollback; the final schema still has no photo-consent field.
+
 - Tightened mobile agenda cards with abbreviated months and single-line availability chips to keep adjacent cards aligned.
 
 - Explicitly welcomed beginners in the English and Dutch helper-chef descriptions.

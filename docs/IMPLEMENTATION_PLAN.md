@@ -1,5 +1,7 @@
 # Implementation plan
 
+Local scheduled reminder queuing is implemented: Saturday 10:00 undecided and Sunday 18:00 confirmed, with timezone conversion, conditional writes, catch-up limits and per-registration deduplication. The operations runner queues these after cleanup/cutoff cancellation/waiting-list promotion. SMTP transport, rendering, retries and production scheduler remain subsequent slices. See EMAIL_REMINDERS.md.
+
 Local admin increment now covers the shared login, registration/waiting lists with safe edits, gathering editing/cancellation, gathering-day manual promotions and recipe/photo publication. Production auth validation, email/password-reset delivery, R2 provisioning approval and launch operations remain separate gates. See ADMIN.md.
 
 Local meal allocation and automatic waiting-list promotion through Sunday are implemented, with atomic notification intents and a combined privacy/waiting-list watcher. Authenticated contacted-person promotion is implemented locally; email delivery and production scheduling remain subsequent gates. See WAITING_LIST.md.

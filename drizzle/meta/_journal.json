@@ -99,6 +99,20 @@
       "when": 1792065046433,
       "tag": "0013_naive_vapor",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1792079329752,
+      "tag": "0014_gorgeous_nico_minoru",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "6",
+      "when": 1792084109000,
+      "tag": "0015_secret_omega_sentinel",
+      "breakpoints": true
     }
   ]
 }
