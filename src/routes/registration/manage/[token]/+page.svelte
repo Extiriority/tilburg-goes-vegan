@@ -67,10 +67,12 @@
       {/if}
 
       <h2>{registration.full_name}</h2>
+      <p>{$locale==='nl'?'Groepsgrootte':'Group size'}: {1+registration.extra_guests} · {$locale==='nl'?'Te betalen op locatie':'Due on site'}: €{(registration.extra_guests+(registration.role==='chef'?0:1))*7}</p>
       <p>{formatter.format(registration.starts_at)}</p>
       <p>{registration.venue} · {registration.address}</p>
       <p>{registration.email_normalized}</p>
 
+      <p class="small muted">{$locale==='nl'?'Statuswijzigingen en annulering gelden voor je hele groep.':'Status changes and cancellation apply to your whole group.'}</p>
       <p>
         {registration.role === 'chef'
           ? t.chef

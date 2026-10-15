@@ -173,3 +173,15 @@ it('rechecks token revocation inside the mutation transaction',async()=>{
   expect(await n('registration_mutations')).toBe(0);
   expect(await n('email_outbox')).toBe(1);
 });
+
+it('reserves whole groups atomically, including a chef plus paying guests, and rejects changed retries',async()=>{
+  await db.prepare("UPDATE events SET capacity=10 WHERE id='e'").run();
+  const values=await Promise.all(Array.from({length:5},async(_,i)=>({...await input(`group${i}@example.invalid`,i===0?'chef':'guest'),extraGuests:2})));
+  const results=await Promise.all(values.map(value=>register(db,secret,value,now)));
+  expect(results.filter(r=>r.registration.status==='confirmed')).toHaveLength(3);
+  expect(await db.prepare("SELECT COALESCE(sum(seats),0) AS seats FROM confirmed_participants WHERE event_id='e'").first('seats')).toBe(9);
+  expect(results.every(r=>r.registration.extra_guests===2)).toBe(true);
+  const repeated=await register(db,secret,values[0],now);expect(repeated.registration.id).toBe(results[0].registration.id);
+  await expect(register(db,secret,{...values[0],extraGuests:3},now)).rejects.toMatchObject({code:'conflict'});
+  await expect(db.prepare("UPDATE events SET capacity=8 WHERE id='e'").run()).rejects.toThrow();
+});

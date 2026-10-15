@@ -317,7 +317,7 @@
         <p class="eyebrow">{t.recipes}</p>
         <h2 id="recipes-title" class="section-title">{t.recipeTitle}</h2>
         <p class="section-intro">{t.recipeIntro}</p>
-        <p class="recipe-notice">{t.recipePending}</p>
+        {#if data.hasRecipes}<a class="button" style="margin-top:24px" href="/recipes">{locale==='nl'?'Bekijk de recepten':'Browse recipes'} ↗</a>{:else}<p class="recipe-notice">{t.recipePending}</p>{/if}
       </div>
       <Photo name="ramen" alt={t.photoAlts.ramen} />
     </div>
@@ -333,7 +333,7 @@
           {t.emailLead} <a href={`mailto:${data.site.email}`}>{data.site.email}</a>.
         </p>
 
-        <LocationCard venue={data.site.venue} address={data.site.address} mapsUrl={data.site.mapsUrl} mapsEmbedUrl={data.site.mapsEmbedUrl} {locale} />
+        <LocationCard venue={first.venue} address={first.address} mapsUrl={first.mapsUrl} mapsEmbedUrl={first.address===data.site.address?data.site.mapsEmbedUrl:undefined} {locale} />
 
         <Photo name="lange-tafel" alt={t.photoAlts['lange-tafel']} class="join-photo" />
       </div>

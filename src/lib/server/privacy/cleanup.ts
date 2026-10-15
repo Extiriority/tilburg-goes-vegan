@@ -22,6 +22,7 @@ export async function cleanupPrivacy(db: D1Database, now = Date.now()) {
         .bind(crypto.randomUUID(), DAY, now, event.id, now - DAY)
     ];
     if (event.ends_at <= now - 7 * DAY) {
+      const identityRunId = crypto.randomUUID();
       statements.push(
         db.prepare(`DELETE FROM email_outbox WHERE event_id IN (${eligible})
           OR registration_id IN (SELECT id FROM registrations WHERE event_id IN (${eligible})) RETURNING id`)
@@ -31,14 +32,16 @@ export async function cleanupPrivacy(db: D1Database, now = Date.now()) {
         db.prepare(`INSERT INTO privacy_cleanup_runs (id,event_id,cutoff,kind,affected_rows,completed_at)
           SELECT ?,id,ends_at+?,'identity',changes(),? FROM events WHERE id=? AND ends_at<=?
           ON CONFLICT(event_id,kind) DO NOTHING`)
-          .bind(crypto.randomUUID(), 7 * DAY, now, event.id, now - 7 * DAY)
+          .bind(identityRunId, 7 * DAY, now, event.id, now - 7 * DAY),
+        db.prepare(`DELETE FROM walk_in_guests WHERE event_id IN (${eligible}) RETURNING id`).bind(event.id, now - 7 * DAY),
+        db.prepare('UPDATE privacy_cleanup_runs SET affected_rows=affected_rows+changes() WHERE id=?').bind(identityRunId)
       );
     }
     const results = await db.batch(statements);
     dietaryRows += results[0].meta.changes;
     if (statements.length > 2) {
       deletedEmails += results[2].results.length;
-      deletedRegistrations += results[3].results.length;
+      deletedRegistrations += results[3].results.length + results[5].results.length;
     }
   }
   // Respect message-specific retention even for unlinked operational emails.

@@ -19,7 +19,9 @@
     "privacy:cleanup:local": "node --experimental-strip-types scripts/cleanup-local.mjs",
     "privacy:watch:local": "node --experimental-strip-types scripts/cleanup-local.mjs --watch",
     "operations:run:local": "node --experimental-strip-types scripts/operations-local.mjs",
-    "operations:watch:local": "node --experimental-strip-types scripts/operations-local.mjs --watch"
+    "operations:watch:local": "node --experimental-strip-types scripts/operations-local.mjs --watch",
+    "admin:setup:local": "node --experimental-strip-types scripts/setup-admin-local.mjs",
+    "format:schema": "prettier src/lib/server/db/schema.ts --write --single-quote --tab-width 2 --print-width 100"
   },
   "dependencies": {
     "@fontsource-variable/fredoka": "^5.3.0",
@@ -36,6 +38,8 @@
     "@types/node": "^22.0.0",
     "drizzle-kit": "^0.31.0",
     "miniflare": "4.20260730.0",
+    "prettier": "^3.9.10",
+    "prettier-plugin-svelte": "^4.1.1",
     "svelte": "^5.38.0",
     "svelte-check": "^4.3.0",
     "tailwindcss": "^4.1.0",

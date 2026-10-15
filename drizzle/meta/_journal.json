@@ -36,6 +36,48 @@
       "when": 1791984307032,
       "tag": "0004_living_micromax",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1791999791948,
+      "tag": "0005_nifty_silver_surfer",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1792004268056,
+      "tag": "0006_slim_the_leader",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1792016714888,
+      "tag": "0007_exotic_nemesis",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1792016996939,
+      "tag": "0008_loose_elektra",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1792017691487,
+      "tag": "0009_little_sally_floyd",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1792019844126,
+      "tag": "0010_overconfident_viper",
+      "breakpoints": true
     }
   ]
 }

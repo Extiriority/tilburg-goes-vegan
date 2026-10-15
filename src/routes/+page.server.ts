@@ -8,31 +8,35 @@ import { registrationEnabled } from '$lib/server/registrations/config';
 import { createSubmissionToken } from '$lib/server/registrations/tokens';
 import { readRegistrationForm } from '$lib/server/registrations/validation';
 import { register, RegistrationError } from '$lib/server/registrations/service';
+import { registrationWindow } from '$lib/server/events/window';
 
 export const load: PageServerLoad = async ({ platform }) => {
   const now = Date.now();
   const occurrences = upcomingOccurrences(now);
   const ready=registrationEnabled(platform?.env);
-  const registration={registrationReady:ready,submissionToken:ready?await createSubmissionToken(platform!.env.MANAGEMENT_TOKEN_SECRET!):''};
+  const registration={registrationReady:ready,submissionToken:ready?await createSubmissionToken(platform!.env.MANAGEMENT_TOKEN_SECRET!):'',hasRecipes:false};
   if (!platform?.env.DB) return { ...registration,site: confirmedSite, gatherings: occurrences.map((event) => ({ ...event, id:'', canRegister:false, registrationOpensAt:registrationOpensAt(event.startsAt), venue: confirmedSite.venue, address: confirmedSite.address, mapsUrl: confirmedSite.mapsUrl, availability: 'setup_pending' })) };
   const rows = await platform.env.DB.prepare(`
     SELECT e.id,e.occurrence_key,e.starts_at,e.ends_at,e.registration_cutoff,e.capacity,e.status,v.name AS venue,v.address,
-      (SELECT count(*) FROM registrations r WHERE r.event_id=e.id AND r.status='confirmed') AS confirmed
-    FROM events e JOIN venues v ON v.id=e.venue_id WHERE occurrence_key IN (${occurrences.map(() => '?').join(',')})
-  `).bind(...occurrences.map((e) => e.occurrenceKey)).all<{
+      (SELECT COALESCE(sum(seats),0) FROM confirmed_participants r WHERE r.event_id=e.id) AS confirmed
+    FROM events e JOIN venues v ON v.id=e.venue_id WHERE e.ends_at>? ORDER BY e.starts_at,e.id LIMIT 4
+  `).bind(now).all<{
     id:string; occurrence_key: string; starts_at: number; ends_at: number; registration_cutoff: number;
     capacity: number; status: string; confirmed: number; venue: string; address: string;
   }>();
-  return { ...registration,site: confirmedSite, gatherings: occurrences.map((occurrence) => {
-    const row = rows.results.find((r) => r.occurrence_key === occurrence.occurrenceKey);
-    return row ? {
+  const hasRecipes=!!await platform.env.DB.prepare('SELECT id FROM recipes LIMIT 1').first();
+  const gatherings=await Promise.all(rows.results.map(async(row)=>{
+    const window=await registrationWindow(platform.env.DB,row.id);
+    const opensAt=window?.opensAt??registrationOpensAt(row.starts_at);
+    return {
       occurrenceKey: row.occurrence_key, startsAt: row.starts_at, endsAt: row.ends_at,
-      registrationOpensAt:registrationOpensAt(row.starts_at), id:row.id, canRegister:now>=registrationOpensAt(row.starts_at) && ready && row.status==='scheduled' && now<row.registration_cutoff,
+      registrationOpensAt:opensAt, id:row.id, canRegister:now>=opensAt && ready && row.status==='scheduled' && now<row.registration_cutoff,
       registrationCutoff: row.registration_cutoff,
       venue: row.venue, address: row.address, mapsUrl: row.address === confirmedSite.address ? confirmedSite.mapsUrl : `https://www.openstreetmap.org/search?query=${encodeURIComponent(row.address)}`,
-      availability: availability({ registrationOpensAt:registrationOpensAt(row.starts_at), status: row.status, registrationCutoff: row.registration_cutoff, capacity: row.capacity }, row.confirmed, now)
-    } : { ...occurrence, id:'',canRegister:false, registrationOpensAt:registrationOpensAt(occurrence.startsAt), venue: confirmedSite.venue, address: confirmedSite.address, mapsUrl: confirmedSite.mapsUrl, availability: 'setup_pending' };
-  }) };
+      availability: availability({ registrationOpensAt:opensAt, status: row.status, registrationCutoff: row.registration_cutoff, capacity: row.capacity }, row.confirmed, now)
+    };
+  }));
+  return { ...registration,hasRecipes,site: confirmedSite,gatherings:gatherings.length?gatherings:occurrences.map(occurrence=>({...occurrence,id:'',canRegister:false,registrationOpensAt:registrationOpensAt(occurrence.startsAt),venue:confirmedSite.venue,address:confirmedSite.address,mapsUrl:confirmedSite.mapsUrl,availability:'setup_pending'})) };
 };
 
 export const actions: Actions = {

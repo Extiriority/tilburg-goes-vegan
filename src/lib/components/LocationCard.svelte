@@ -1,5 +1,5 @@
 <script lang="ts">
-  let { venue, address, mapsUrl, mapsEmbedUrl, locale }: { venue: string; address: string; mapsUrl: string; mapsEmbedUrl: string; locale: 'en' | 'nl' } = $props();
+  let { venue, address, mapsUrl, mapsEmbedUrl, locale }: { venue: string; address: string; mapsUrl: string; mapsEmbedUrl?: string; locale: 'en' | 'nl' } = $props();
   let mapVisible = $state(false);
   let copy = $derived(locale === 'nl'
     ? { show: 'Toon kaart', note: 'Laadt OpenStreetMap na je klik.', directions: 'Route bekijken', title: `Kaart: ${venue}` }
@@ -8,7 +8,12 @@
 
 <div class="card location-card">
   <div class="map-preview">
-    {#if mapVisible}
+    {#if !mapsEmbedUrl}
+      <a class="map-placeholder" href={mapsUrl} target="_blank" rel="noopener noreferrer">
+        <strong>{locale==='nl'?'Bekijk op OpenStreetMap ↗':'View on OpenStreetMap ↗'}</strong>
+        <span>{locale==='nl'?'Opent in een nieuw tabblad.':'Opens in a new tab.'}</span>
+      </a>
+    {:else if mapVisible}
       <iframe src={mapsEmbedUrl} title={copy.title} referrerpolicy="no-referrer" loading="lazy"></iframe>
     {:else}
       <button class="map-placeholder" type="button" onclick={() => mapVisible = true}>

@@ -1,4 +1,5 @@
 import { localInstant, TIMEZONE, registrationOpensAt } from './schedule.ts';
+import { registrationWindow,priorDinnerSql } from './window.ts';
 
 const SQL_NOW = "CAST(strftime('%s','now') AS INTEGER) * 1000";
 const DAY = 86_400_000;
@@ -11,7 +12,7 @@ export function mondayStartsAt(startsAt: number) {
 // Include this before a post-cutoff registration write in the SAME batch.
 // A delayed scheduler must not count a cancellation after it has freed a seat.
 export function freezeMealAllocation(db: D1Database, eventId: string, now: number) {
-  return db.prepare(`UPDATE events SET meal_allocation=(SELECT count(*) FROM registrations WHERE event_id=events.id AND status='confirmed')
+  return db.prepare(`UPDATE events SET meal_allocation=(SELECT COALESCE(sum(seats),0) FROM confirmed_participants WHERE event_id=events.id AND status='confirmed')
     WHERE id=? AND status='scheduled' AND meal_allocation IS NULL AND registration_cutoff<=MAX(?,${SQL_NOW})`).bind(eventId,now);
 }
 
@@ -19,10 +20,10 @@ const candidateSql = `SELECT r.id,r.version FROM registrations r JOIN events e O
   WHERE e.id=? AND e.starts_at=? AND e.status='scheduled' AND r.status='waiting_list' AND r.anonymized_at IS NULL
     AND MAX(?,${SQL_NOW})<? AND e.ends_at>MAX(?,${SQL_NOW})
     AND (e.registration_cutoff>MAX(?,${SQL_NOW}) OR e.meal_allocation IS NOT NULL)
-    AND (SELECT count(*) FROM registrations WHERE event_id=e.id AND status='confirmed')<e.capacity
-    AND (e.meal_allocation IS NULL OR (SELECT count(*) FROM registrations WHERE event_id=e.id AND status='confirmed')<e.meal_allocation)
-    AND (r.role='guest' OR (SELECT count(*) FROM registrations WHERE event_id=e.id AND status='confirmed' AND role=r.role)<3)
-  AND ?<=MIN(?,${SQL_NOW}) ORDER BY r.created_at,r.id LIMIT 1`;
+    AND (SELECT COALESCE(sum(seats),0) FROM confirmed_participants WHERE event_id=e.id AND status='confirmed')+r.extra_guests+1<=e.capacity
+    AND (e.meal_allocation IS NULL OR (SELECT COALESCE(sum(seats),0) FROM confirmed_participants WHERE event_id=e.id AND status='confirmed')+r.extra_guests+1<=e.meal_allocation)
+    AND (r.role='guest' OR (SELECT count(*) FROM confirmed_participants WHERE event_id=e.id AND status='confirmed' AND role=r.role)<3)
+  AND ?<=MIN(?,${SQL_NOW}) AND (${priorDinnerSql}) IS ? ORDER BY r.created_at,r.id LIMIT 1`;
 
 /** Internal scheduler/service only: no participant-facing promotion endpoint. */
 export async function promoteWaitingList(db: D1Database, eventId: string, now=Date.now()) {
@@ -30,11 +31,13 @@ export async function promoteWaitingList(db: D1Database, eventId: string, now=Da
   const event = await db.prepare('SELECT starts_at,capacity FROM events WHERE id=?').bind(eventId).first<{starts_at:number;capacity:number}>();
   if (!event) return { promoted:0 };
   const monday = mondayStartsAt(event.starts_at);
+  const window = await registrationWindow(db,eventId);
+  if(!window)return {promoted:0};
   // Freeze even on Monday; never automatically promote that day.
   await freezeMealAllocation(db,eventId,now).run();
   if (now>=monday) return {promoted:0};
   let promoted=0;
-  const bindings=[eventId,event.starts_at,now,monday,now,now,registrationOpensAt(event.starts_at),now];
+  const bindings=[eventId,event.starts_at,now,monday,now,now,window.opensAt,now,window.prior_end];
   // Bound the work per pass; the next scheduler pass can continue if competing
   // writes keep changing the candidate. Each write independently enforces FIFO.
   for (let attempt=0;attempt<event.capacity+10;attempt++) {

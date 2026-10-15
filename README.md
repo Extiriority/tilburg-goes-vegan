@@ -30,3 +30,7 @@ The lockfile includes patched dependency overrides for cookie parsing and develo
 Future bindings: public media and private backups must be separate R2 buckets. SMTP credentials and the private coordination invitation belong in deployment secrets, never admin settings or client code. Do not configure live resources until infrastructure spikes and organizer decisions are resolved.
 
 
+# Local organizer panel
+
+See [docs/ADMIN.md](docs/ADMIN.md) for local login, editable registrations/waiting list, gathering changes and recipe/photo publication. Run `npm run admin:setup:local` after local database setup, restart development, then open `/admin`. The password is stored only as `LOCAL_ADMIN_PASSWORD` in ignored `.dev.vars`; do not commit or share it. Admin routes are disabled in production builds.
+

@@ -5,6 +5,7 @@ export const registrationInput = z.object({
   eventId: z.string().min(1).max(100),
   fullName: z.string().trim().min(1).max(160),
   email: z.string().trim().toLowerCase().max(254).pipe(z.email()),
+  extraGuests: z.coerce.number().int().min(0).max(99).default(0),
   role: z.enum(['guest', 'helper_chef', 'chef']),
   language: z.enum(['en', 'nl']),
   undecided: z.boolean(),
@@ -21,13 +22,13 @@ export const detailsInput = z.object({
   comments: optionalText(2000)
 }).refine(value => !value.dietaryNotes || value.dietaryConsent, { path: ['dietaryConsent'], message: 'dietary_consent' });
 
-export type RegistrationInput = z.infer<typeof registrationInput>;
+export type RegistrationInput = Omit<z.infer<typeof registrationInput>, 'extraGuests'> & { extraGuests?: number };
 export type DetailsInput = z.infer<typeof detailsInput>;
 
 export function readRegistrationForm(form: FormData) {
   return registrationInput.safeParse({
     eventId: form.get('eventId'), fullName: form.get('fullName'), email: form.get('email'), role: form.get('role'), language: form.get('language'),
-    undecided: form.get('undecided') === 'on', dietaryNotes: form.get('dietaryNotes') ?? '', dietaryConsent: form.get('dietaryConsent') === 'on',
+    extraGuests: form.get('extraGuests') ?? 0, undecided: form.get('undecided') === 'on', dietaryNotes: form.get('dietaryNotes') ?? '', dietaryConsent: form.get('dietaryConsent') === 'on',
     comments: form.get('comments') ?? '', submissionToken: form.get('submissionToken')
   });
 }

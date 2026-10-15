@@ -1,6 +1,28 @@
 # Changelog
 
+## 2026-10-15
+
+- Added a yellow, green-text Allergy badge before participant roles when retained dietary/allergy notes are present.
+
+- Matched Role and Additional guests control heights and bottom alignment.
+
+- Kept participant Role and Additional guests fields in two columns on mobile.
+
+- Restored participant role labels beside names on mobile.
+
+- Fixed stray checkbox markup, enlarged payment/reimbursement checkboxes to 32px, and allowed mobile controls to wrap without crowding labels.
+
+- Moved Paid/Reimbursed labels before their checkboxes, aligned at the far right with full-label touch targets.
+
+- Removed the redundant per-chef reimbursement helper line; gathering totals and expense controls remain available.
+
 ## 2026-10-14
+
+- Reformatted and grouped `schema.ts`; added repeatable Prettier tooling. Formatting alone generates no migration.
+- Added the local shared organizer login and admin overview, paginated registration/waiting lists, role/contact/comment edits, cancellations, gathering date/venue/capacity edits, and contacted-person FIFO promotion. Confirmed Saturday cutoff and gathering-day midnight/19:00 boundaries for special dates.
+- Added immediate recipe publishing, search/category public pages, ordered ingredients/steps, browser-generated WebP variants in local R2, cover/order/alt-text controls and ownership/version checks. Admin writes, audit records and notification intents commit atomically. Migration 0005 applies locally.
+- Browser verification covered login/logout, synthetic recipe publication, photo conversion/upload/public rendering and mobile layout. Synthetic content was removed; existing participant/gathering data was preserved. Production admin and registration remain disabled; SMTP/reset delivery and deployment remain pending.
+- Admin verification: 66 automated tests, type checks and the Cloudflare adapter build pass. The registration location card follows the next gathering’s venue; changed addresses without verified coordinates use an OpenStreetMap search link rather than an incorrect embedded marker.
 
 - Confirmed Saturday meal allocation equals confirmed participants, including volunteers. Added one-time snapshots before post-cutoff edits/cancellations and atomic FIFO waiting-list promotions constrained by role, capacity, opening time, meal ceiling and Monday midnight.
 - Added a combined local privacy/waiting-list operations runner with queued participant/volunteer promotion intents. Email delivery, Monday authenticated manual actions and production cron remain pending; nothing deployed. Local verification changed no records.
@@ -61,3 +83,24 @@
 - Added all 20 database tables, registered custom capacity triggers, eight passing tests and CI for check/test/build/local migrations. Patched dependency advisories; installation audit reports zero vulnerabilities.
 - No product behavior changes, paid services, production settings or deployment.
 
+
+- Combined gathering, registration and waiting-list management with next-gathering default, status-ordered colored badges and compact editors. Added one-off gatherings and organizer-only name-only guests, with explicit atomic capacity/meal overrides and preserved waiting-list priority. Added distinct No-show attendance and seven-day cleanup. Migration 0006 applies locally; synthetic browser QA data removed and existing registrations preserved.
+
+- Refined organizer gathering management into two adjacent columns: gathering details on the left and participants on the right, stacking on mobile. Gathering selection navigates immediately; the add-unique-gathering button replaces Show beside the selector. Participant rows have zero gaps and thin dividers. Type checks and desktop/390px browser checks pass; no data changes or deployment.
+
+- Added organizer count chips for occupied/available seats, fixed meals and per-status totals across the complete gathering. Generalized Add person wording for WhatsApp/in-person attendees using the existing name-only organizer flow. Payment-tracking workflow remains pending organizer clarification; public email requirements and all capacity/privacy rules are unchanged.
+
+- Simplified the gathering summary to a single green occupied-seat chip and an adjacent compact starter/main/dessert budget chip. Server calculates €2/€3/€2 per confirmed person, including chefs and manual additions, without subtraction. Removed available-seat and meal-snapshot chips; preserved pricing, meal allocation and payment scope.
+
+## 2026-10-15
+
+- Count only confirmed people in the participant heading. Added auto-saving status dropdowns with constrained reversals, on-site paid checkbox and editable amounts, including corrections after 19:00 while identity records exist. Added additional-guest fields and atomic whole-group confirmation/wait-list behavior; capacity/meals/budgets count people and volunteer slots count lead registrants. Additive migrations 0007/0008 retain seven-day payment/group deletion. No online payment processing or deployment.
+- Added cancellation-source state so status reversals cannot circumvent undecided deadlines or waiting-list contact rules. Local migrations 0007–0009 applied; 79 automated tests pass. Synthetic group/payment browser QA verified immediate updates, reversal, retained payments and mobile layout; synthetic data removed and existing participant records preserved. Nothing deployed.
+
+- Refined mobile organizer layout: inline gathering selector/+ button, visually hidden page headings, larger right-aligned Paid checkbox and €7 amount-field steps while retaining typed cent amounts. Verified 320/390px fit and keyboard stepping; synthetic QA data removed, existing participants preserved, nothing deployed.
+
+- Removed participant status-count chips; replaced organizer Free labels with actual chef costs and reimbursement controls. Added recorded income/cost/outstanding/final-balance summary, preserving reimbursements when costs are corrected. Migration 0010 applies locally; 81 tests and 320/390px browser checks pass. Synthetic test records removed; nothing deployed.
+
+- Unified chef/payment amount fields with € prefixes and right alignment; removed the visible Cost label and cash-explanation paragraph. Captured desktop/mobile previews with 16 synthetic participants including 3 chefs, then removed the test gathering and participants. Type and 320/390px layout checks pass; real records preserved, nothing deployed.
+
+- Grouped chefs first with a thicker final divider; matched expense/payment number sizes and checkbox alignment.

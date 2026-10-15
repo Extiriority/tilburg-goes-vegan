@@ -111,3 +111,14 @@ it('never promotes cancelled gatherings and resolves Monday midnight through DST
   expect(mondayStartsAt(Date.parse('2027-03-29T17:00:00Z'))).toBe(Date.parse('2027-03-28T22:00:00Z'));
   expect(mondayStartsAt(Date.parse('2027-10-25T17:00:00Z'))).toBe(Date.parse('2027-10-24T22:00:00Z'));
 });
+
+it('keeps a waiting group together and counts its whole size against fixed meals',async()=>{
+  await signup('group');await db.prepare("UPDATE registrations SET extra_guests=2 WHERE id='group'").run();
+  await signup('waiting','waiting_list');await db.prepare("UPDATE registrations SET extra_guests=2 WHERE id='waiting'").run();
+  clock=cutoff;await freezeMealAllocation(timed,'e',clock).run();expect((await allocation())!.meal_allocation).toBe(3);
+  await db.prepare("UPDATE registrations SET status='cancelled' WHERE id='group'").run();
+  await signup('single');expect((await promoteWaitingList(timed,'e',clock)).promoted).toBe(0);
+  await db.prepare("UPDATE registrations SET status='cancelled' WHERE id='single'").run();
+  expect((await promoteWaitingList(timed,'e',clock)).promoted).toBe(1);
+  expect(await db.prepare("SELECT sum(seats) FROM confirmed_participants").first('sum(seats)')).toBe(3);
+});

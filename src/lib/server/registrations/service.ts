@@ -2,6 +2,7 @@ import { hashToken, managementToken, verifySubmissionToken } from './tokens';
 import type { RegistrationInput, DetailsInput } from './validation';
 import { localInstant, TIMEZONE, registrationOpensAt } from '../events/schedule';
 import { freezeMealAllocation } from '../events/waiting-list';
+import { registrationWindow,priorDinnerSql } from '../events/window';
 
 const DAY = 86_400_000;
 // UTC seconds suffice for the whole-second Amsterdam deadlines; use DB time
@@ -14,6 +15,7 @@ export class RegistrationError extends Error {
 
 export type ManagedRegistration = {
   id: string; event_id: string; email_normalized: string; full_name: string;
+  extra_guests: number;
   role: 'guest' | 'helper_chef' | 'chef'; status: RegistrationStatus; language: 'en' | 'nl';
   dietary_notes: string | null; dietary_consent_at: number | null; comments: string | null; version: number;
   starts_at: number; ends_at: number; registration_cutoff: number; event_status: string;
@@ -55,13 +57,15 @@ function organizerIntents(db: D1Database, registrationId: string, key: string, t
 }
 
 export async function register(db: D1Database, secret: string, input: RegistrationInput, now = Date.now()) {
+  const extraGuests = input.extraGuests ?? 0;
+  if(!Number.isInteger(extraGuests)||extraGuests<0||extraGuests>99) throw new RegistrationError('conflict');
   const id = await verifySubmissionToken(secret,input.submissionToken);
   if (!id) throw new RegistrationError('invalid_token');
   const existing = await db.prepare('SELECT * FROM registrations WHERE id=?').bind(id).first<Record<string,unknown>>();
-  if (existing && (existing.event_id!==input.eventId || existing.email_normalized!==input.email || existing.full_name!==input.fullName || existing.role!==input.role || existing.dietary_notes!==input.dietaryNotes || existing.comments!==input.comments)) throw new RegistrationError('conflict');
-  const event = await db.prepare('SELECT starts_at FROM events WHERE id=?').bind(input.eventId).first<{starts_at:number}>();
+  if (existing && (existing.event_id!==input.eventId || existing.email_normalized!==input.email || existing.full_name!==input.fullName || existing.extra_guests!==extraGuests || existing.role!==input.role || existing.dietary_notes!==input.dietaryNotes || existing.comments!==input.comments)) throw new RegistrationError('conflict');
+  const event = await registrationWindow(db,input.eventId);
   if (!event) throw new RegistrationError('closed');
-  const opensAt = registrationOpensAt(event.starts_at);
+  const opensAt = event.opensAt;
   if (!existing && now < opensAt) throw new RegistrationError('not_open');
   const token = await managementToken(secret,id);
   const tokenHash = await hashToken(token);
@@ -69,18 +73,18 @@ export async function register(db: D1Database, secret: string, input: Registrati
   try {
     await db.batch([
       db.prepare(`INSERT INTO registrations
-        (id,event_id,email_normalized,full_name,role,status,language,dietary_notes,dietary_consent_at,comments,created_at,updated_at)
+        (id,event_id,email_normalized,full_name,role,status,language,dietary_notes,dietary_consent_at,comments,created_at,updated_at,extra_guests)
         SELECT ?,e.id,?,?,?,CASE WHEN ? THEN 'undecided'
           WHEN EXISTS (SELECT 1 FROM registrations w WHERE w.event_id=e.id AND w.status='waiting_list' AND w.anonymized_at IS NULL
-            AND (w.role='guest' OR (SELECT count(*) FROM registrations WHERE event_id=e.id AND status='confirmed' AND role=w.role)<3)) THEN 'waiting_list'
-          WHEN (SELECT count(*) FROM registrations WHERE event_id=e.id AND status='confirmed') >= e.capacity
-            OR (e.meal_allocation IS NOT NULL AND (SELECT count(*) FROM registrations WHERE event_id=e.id AND status='confirmed') >= e.meal_allocation)
-            OR (? IN ('chef','helper_chef') AND (SELECT count(*) FROM registrations WHERE event_id=e.id AND status='confirmed' AND role=?) >= 3)
-          THEN 'waiting_list' ELSE 'confirmed' END,?,?,?,?,?,?
+            AND (w.role='guest' OR (SELECT count(*) FROM confirmed_participants WHERE event_id=e.id AND status='confirmed' AND role=w.role)<3)) THEN 'waiting_list'
+          WHEN (SELECT COALESCE(sum(seats),0) FROM confirmed_participants WHERE event_id=e.id AND status='confirmed') + ${extraGuests+1} > e.capacity
+            OR (e.meal_allocation IS NOT NULL AND (SELECT COALESCE(sum(seats),0) FROM confirmed_participants WHERE event_id=e.id AND status='confirmed') + ${extraGuests+1} > e.meal_allocation)
+            OR (? IN ('chef','helper_chef') AND (SELECT count(*) FROM confirmed_participants WHERE event_id=e.id AND status='confirmed' AND role=?) >= 3)
+          THEN 'waiting_list' ELSE 'confirmed' END,?,?,?,?,?,?,?
         FROM events e WHERE e.id=? AND e.status='scheduled' AND e.registration_cutoff>MAX(?,${SQL_NOW})
-          AND e.starts_at=? AND ?<=MIN(?,${SQL_NOW})
+          AND e.starts_at=? AND (${priorDinnerSql}) IS ? AND ?<=MIN(?,${SQL_NOW})
         ON CONFLICT(id) DO NOTHING`)
-        .bind(id,input.email,input.fullName,input.role,input.undecided?1:0,input.role,input.role,input.language,input.dietaryNotes,input.dietaryNotes?now:null,input.comments,now,now,input.eventId,now,event.starts_at,opensAt,now),
+        .bind(id,input.email,input.fullName,input.role,input.undecided?1:0,input.role,input.role,input.language,input.dietaryNotes,input.dietaryNotes?now:null,input.comments,now,now,extraGuests,input.eventId,now,event.starts_at,event.prior_end,opensAt,now),
       db.prepare(`INSERT INTO registration_tokens (id,registration_id,token_hash,expires_at,created_at)
         SELECT r.id,r.id,?,e.ends_at,? FROM registrations r JOIN events e ON e.id=r.event_id WHERE r.id=?
         ON CONFLICT(id) DO NOTHING`).bind(tokenHash,now,id),
@@ -94,7 +98,7 @@ export async function register(db: D1Database, secret: string, input: Registrati
   }
   const result = await getManagedRegistration(db,token,now);
   if (!result) throw new RegistrationError('closed');
-  if (result.email_normalized!==input.email || result.full_name!==input.fullName || result.role!==input.role || result.event_id!==input.eventId || result.dietary_notes!==input.dietaryNotes || result.comments!==input.comments || result.language!==input.language) throw new RegistrationError('conflict');
+  if (result.email_normalized!==input.email || result.full_name!==input.fullName || result.extra_guests!==extraGuests || result.role!==input.role || result.event_id!==input.eventId || result.dietary_notes!==input.dietaryNotes || result.comments!==input.comments || result.language!==input.language) throw new RegistrationError('conflict');
   return { token, registration: result };
 }
 
@@ -106,9 +110,10 @@ export async function changeRegistration(db: D1Database, token: string, action: 
   if (current.status==='cancelled' || (action!=='cancel' && current.event_status==='cancelled')) throw new RegistrationError('invalid_transition');
   if (action==='confirm' && current.status!=='undecided') throw new RegistrationError('invalid_transition');
   if (action==='confirm' && now>=current.registration_cutoff) throw new RegistrationError('closed');
-  if (action==='confirm' && now<registrationOpensAt(current.starts_at)) throw new RegistrationError('not_open');
+  const window=action==='confirm'?await registrationWindow(db,current.event_id):null;
+  if (action==='confirm' && (!window || now<window.opensAt)) throw new RegistrationError('not_open');
   if (action==='confirm' && await db.prepare(`SELECT 1 FROM registrations w WHERE w.event_id=? AND w.status='waiting_list' AND w.anonymized_at IS NULL
-    AND (w.role='guest' OR (SELECT count(*) FROM registrations WHERE event_id=w.event_id AND status='confirmed' AND role=w.role)<3) LIMIT 1`)
+    AND (w.role='guest' OR (SELECT count(*) FROM confirmed_participants WHERE event_id=w.event_id AND status='confirmed' AND role=w.role)<3) LIMIT 1`)
     .bind(current.event_id).first()) throw new RegistrationError('full');
   const nextVersion=expectedVersion+1;
   const tokenHash=await hashToken(token);
@@ -118,13 +123,13 @@ export async function changeRegistration(db: D1Database, token: string, action: 
         WHERE id=? AND version=? AND status<>'cancelled' AND EXISTS (SELECT 1 FROM events WHERE id=event_id AND status='scheduled' AND ends_at>MAX(?,${SQL_NOW})
           AND (registration_cutoff>${SQL_NOW} OR meal_allocation IS NOT NULL)) ${validToken}`)
       .bind(details!.dietaryNotes,details!.dietaryNotes?now:null,details!.comments,now,current.id,expectedVersion,now,tokenHash,now)
-    : db.prepare(`UPDATE registrations SET status=?,version=version+1,updated_at=? WHERE id=? AND version=? AND status=?
-        AND EXISTS (SELECT 1 FROM events WHERE id=event_id AND ends_at>MAX(?,${SQL_NOW})
+    : db.prepare(`UPDATE registrations SET previous_status=status,status=?,version=version+1,updated_at=? WHERE id=? AND version=? AND status=?
+        AND EXISTS (SELECT 1 FROM events e WHERE id=event_id AND ends_at>MAX(?,${SQL_NOW})
           AND (status='cancelled' OR registration_cutoff>${SQL_NOW} OR meal_allocation IS NOT NULL)
-          ${action==='confirm'?`AND status='scheduled' AND registration_cutoff>MAX(?,${SQL_NOW}) AND starts_at=? AND ?<=MIN(?,${SQL_NOW})
-            AND NOT EXISTS (SELECT 1 FROM registrations w WHERE w.event_id=events.id AND w.status='waiting_list' AND w.anonymized_at IS NULL
-              AND (w.role='guest' OR (SELECT count(*) FROM registrations WHERE event_id=events.id AND status='confirmed' AND role=w.role)<3))`:''}) ${validToken}`)
-      .bind(action==='cancel'?'cancelled':'confirmed',now,current.id,expectedVersion,current.status,now,...(action==='confirm'?[now,current.starts_at,registrationOpensAt(current.starts_at),now]:[]),tokenHash,now);
+          ${action==='confirm'?`AND status='scheduled' AND registration_cutoff>MAX(?,${SQL_NOW}) AND starts_at=? AND (${priorDinnerSql}) IS ? AND ?<=MIN(?,${SQL_NOW})
+            AND NOT EXISTS (SELECT 1 FROM registrations w WHERE w.event_id=e.id AND w.status='waiting_list' AND w.anonymized_at IS NULL
+              AND (w.role='guest' OR (SELECT count(*) FROM confirmed_participants WHERE event_id=e.id AND status='confirmed' AND role=w.role)<3))`:''}) ${validToken}`)
+      .bind(action==='cancel'?'cancelled':'confirmed',now,current.id,expectedVersion,current.status,now,...(action==='confirm'?[now,current.starts_at,window!.prior_end,window!.opensAt,now]:[]),tokenHash,now);
   const key=`registration:${current.id}:${action}:${nextVersion}`;
   // The CHECK makes an unsuccessful conditional update abort the entire batch,
   // preventing a racing request from queuing an email for somebody else's update.

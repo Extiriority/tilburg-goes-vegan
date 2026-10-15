@@ -10,7 +10,7 @@
 
 ## Implemented slice
 
-Waiting-list amendment: post-cutoff edits/cancellations now freeze the confirmed-at-cutoff meal snapshot before changing a registration. Local operations automatically promote eligible waiting-list participants through Sunday and queue notification intents; new signups/undecided confirmation cannot jump eligible waiting-list participants. See WAITING_LIST.md for the runner and remaining Monday/admin gates.
+Waiting-list amendment: post-cutoff edits/cancellations now freeze the confirmed-at-cutoff meal snapshot before changing a registration. Local operations automatically promote eligible waiting-list participants through Sunday and queue notification intents; new signups/undecided confirmation cannot jump eligible waiting-list participants. See WAITING_LIST.md for the runner and authenticated admin promotion rules.
 
 Homepage registration uses a SvelteKit action and Zod validation, localized field errors, full name/email/role, optional dietary notes and comments, and separate explicit dietary consent. Trim/lowercase email normalization matches the database constraint. Optional text is limited to 2,000 characters; name to 160 and email to 254. No group bookings, payments, participant accounts or course selection.
 
@@ -18,7 +18,7 @@ The single INSERT SELECT decides confirmed/undecided/waiting_list while D1 seria
 
 A signed random submission credential gives idempotent retries. Domain-separated HMAC management credentials are unguessable and reconstructible for the later email renderer, while D1 stores only their SHA-256 hashes. The HMAC key is a server binding; do not rotate it mid-event without planning link reissuance and queued-email rendering. Existing token hashes, explicit revocation and dinner-end expiry govern access. No raw bearer tokens, dietary details or rendered email bodies are stored in operational logs/outbox payloads.
 
-The private page shows status, event/venue, price, private-link saving instructions and the actual email-delivery limitation. It supports undecided-to-confirmed before cutoff subject to capacity, cancellation before dinner ends, and dietary/comment edits. Role changes require organizer approval and have no participant write path. Late cancellation/dietary warnings are shown; changed late dietary details queue organizer alerts. Monday confirmed cancellations before dinner time queue vacancy attention. General waitlist promotion remains the next increment.
+The private page shows status, event/venue, price, private-link saving instructions and the actual email-delivery limitation. It supports undecided-to-confirmed before cutoff subject to capacity, cancellation before dinner ends, and dietary/comment edits. Role changes require organizer approval and have no participant write path. Late cancellation/dietary warnings are shown; changed late dietary details queue organizer alerts. Monday confirmed cancellations before dinner time queue vacancy attention. Automatic waitlist promotion and contacted-person admin promotion are implemented locally; see WAITING_LIST.md and ADMIN.md.
 
 Mutation versions reject stale requests. The new `registration_mutations` receipt table uses a CHECK on SQLite `changes()` to abort the D1 batch if a conditional update affects no row; this prevents a losing request from queuing an email for another request's successful update. Token revocation/expiry is rechecked in the UPDATE, not only when loading the record. Failed outbox writes roll back the registration or edit.
 
@@ -38,7 +38,7 @@ Use synthetic `example.invalid` details for tests. SMTP is unconfigured: outbox 
 
 ## Remaining gates
 
-SMTP transport/renderer, retry worker, automatic waitlist promotions, Saturday allocation policy, cron jobs, admin role approvals, abuse/rate limits, complete bilingual privacy notice and retention jobs are subsequent increments. Outbox `purge_at` uses the confirmed dinner-end + seven elapsed 24-hour days deadline. Local retention cleanup is implemented; see PRIVACY_CLEANUP.md. Production cron and external-system deletion remain pending. Cleanup must cover registration identity/dietary fields, token rows, mutation receipts where appropriate, outbox recipients, mailboxes and restores. This increment must not be exposed for real public registrations before those gates pass.
+SMTP transport/renderer, retry worker, production cron, public abuse protections, complete bilingual privacy review and external-system deletion remain subsequent increments. Local waitlist operations, fixed meal allocation, admin role approvals and retention cleanup are implemented. Outbox `purge_at` uses the confirmed dinner-end + seven elapsed 24-hour days deadline. Local retention cleanup is implemented; see PRIVACY_CLEANUP.md. Production cron and external-system deletion remain pending. Cleanup must cover registration identity/dietary fields, token rows, mutation receipts where appropriate, outbox recipients, mailboxes and restores. This increment must not be exposed for real public registrations before those gates pass.
 
 No deployment. No private coordination invitation has been invented or committed.
 
