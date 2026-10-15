@@ -122,3 +122,57 @@ Removed the Saved confirmation label; Saving and error feedback remain available
 Removed per-chef Saving text as well; shared gathering feedback and inline errors remain.
 
 To reimburse has a yellow background with green text while outstanding cents are positive; the highlight clears at zero and follows live previews.
+
+Moved dietary/allergy information to a gathering chip beside the course budget, with expandable unlinked notes for confirmed bookings across all pages. Removed person-level badges/notes and dietary fields from participant response objects. Seat/budget visible labels are omitted while accessible labels remain. Structured allergen selection is proposed, not implemented.
+
+Structured allergen categories appear as yellow gathering chips with decorative icons and localized text. Optional preparation/Other and existing legacy text appear in expandable gathering details without participant links. Cancelled, undecided and waiting-list dietary information is excluded from cooking summaries.
+
+All 14 allergen chips use the plain Erudus SVG set, hosted under static/icons/allergens with its MIT license. CSS masks inherit green text color; SVGs are decorative with visible localized labels. No external icon requests or runtime dependency.
+
+The gluten gathering chip reads Gluten; the registration selection reads Gluten-containing cereals (NL: Glutenbevattende granen). Stored category IDs are unchanged.
+
+The gathering chip shows No allergens reported on desktop / No reports on mobile (NL: Geen allergenen gemeld / Geen meldingen). Tap to edit extra reports from other polls in the existing checkbox UI. With reported categories, an Allergens edit chip stays available. Website reports remain read-only and merge with organizer entries. The editor uses optimistic versions and consent confirmation; no names/poll links are requested. Empty-state chips fit one row at 320px and 375px in browser QA. Dietary deletion covers both sources at +24h.
+
+Existing allergen chips (and Other dietary details) now toggle the organizer editor directly. No separate + Allergens chip is shown. Collapsing the editor's dietary section closes the complete editor, including its consent and Save controls. The No reports chip remains the empty-state entry point.
+
+Organizer navigation is a single compact row of 44px SVG icon links (Overview/grid, Gatherings/calendar, Recipes/book), with localized accessible names, tooltips and active-route styling. Removed the public homepage back link and visual organizer heading. Logout is available as a labeled icon button on Overview only; its POST action is unchanged.
+
+Participant status now uses an icon-only colored trigger (check, clock, question mark, absent person, cross). A top-layer popover shows localized names and SVG icons, checked state and disabled choices. Arrow keys/Home/End navigate enabled options, Enter selects, Escape returns focus, Tab exits and outside clicks dismiss. Changes still submit immediately through existing server actions. Native select/Save fallback remains without JavaScript; labels/tooltips identify current status and person.
+
+Add person is now a quick form: Name, Additional guests (0), Source (WhatsApp default / Unannounced), Add person. Removed explanatory paragraphs and override fields. Whole parties can be recorded after cutoff; capacity and fixed meals are raised together when needed. Legacy explicit overrides remain supported internally; the quick flow records source-based system accommodation. Source appears alongside Guest in the list. Existing website registrations, waiting-list priority, cancellation/payment behavior and +7-day deletion remain intact. Verified 375px layout and both source choices; no preview participants created.
+
+Quick Add person uses enhanced form submission without page navigation. The open panel and selected source remain; successful adds refresh counts/list and submission ID, clear Name, reset Additional guests to 0 and refocus Name. Pending submissions disable the add button and reject duplicate clicks. Failed submissions retain entered values.
+
+Quick-add now places Name and Additional guests together, with Role and Source on the next row. Role defaults to Guest; Chef and Helper chef are available for both sources. Role and source remain selected during repeated adds. Lead roles share three-place volunteer limits with website entries; extra guests occupy seats/meals and pay €7 each. Organizer chefs sort with chefs and have actual-cost/reimbursement controls included in gathering totals. Existing organizer roles can be corrected in the row editor. Verified aligned 48px fields at 375px and no overflow at 320px; no participant records changed during preview.
+
+Participants now shares the gathering card style. An accessible 44px person-plus icon beside the heading toggles the existing Add person details, preserving native keyboard/no-JavaScript behavior and the enhanced repeated-entry form. Participant rows remain flush with dividers inside the outer card.
+
+Only one participant editing surface stays open: Add person closes an existing person editor, and opening any person closes Add person and the previous person editor. Successful repeated adds still keep Add person open.
+
+Status choices: No-show opens at Amsterdam midnight on the gathering date; it marks absence without changing the meaning of Confirmed as a booking. Existing Undecided appears until cutoff; it cannot be newly chosen. New Waiting list selections require full total capacity; current waiting-list entries remain shown. Full/contacted FIFO promotion guards remain server-side. Below the main list, separate Waiting list, No-show and Cancelled sections show whole-party counts. No-show replaces Paid with Missing EUR based on party fees minus received payments (chefs' lead fee is zero); cancelled rows hide payment and expense controls, preserving stored money in actual finance totals. Reversing status still checks existing limits.
+
+Participants contains confirmed bookings only. All other visible statuses (waiting list, undecided, no-show, cancelled) are combined under a single Other registrations heading in a separate card below, with their individual status controls retained. This replaces the status-specific headings inside the participant card.
+
+The No allergens reported chip includes a crossed-out allergen SVG on desktop and mobile. At 360px and below it uses the icon with the full accessible name and tooltip to keep the counter row compact; this remains an absence-of-reports indicator, not an allergen-free claim.
+
+Corrected course estimate to max(0,n-3)*EUR 2/3/2, using confirmed people including additional guests. Examples: n=10 gives 14/21/14 (49 total); n=20 gives 34/51/34 (119 total). Counts below three produce zero. Actual received/cost/reimbursement totals are unchanged.
+
+Gathering creation/editing uses separate Date and explicit 24-hour Time fields, avoiding browser/OS AM-PM formatting. HH:mm is validated on client and server; four typed digits such as 1900 become 19:00. Default new dinner times are 19:00/22:00. Server form parsing combines local date/time strings before the existing Amsterdam/DST validation; no-JavaScript form submission remains supported.
+
+Coconut/Kokos is an additional organizer dietary checkbox, stored separately from tree nuts and shown as its own gathering chip with a project-authored SVG. Public forms keep their existing choices; any existing coconut selection remains readable/editable. Consent and +24h deletion apply unchanged.
+
+NL/EN buttons are available at the right of the compact organizer navigation. Switching updates the shared locale instantly and saves the existing language cookie without reloading the current form. Failure restores the previous language; no-JavaScript submissions return to the same admin page.
+# Compact gathering feedback
+
+Successful gathering-panel saves show a polite, fixed notification at the top for three seconds without shifting content. Repeated saves restart it; reduced-motion preferences disable fading. The gathering title has a labeled pencil button to toggle its editor, replacing the lower Edit gathering summary.
+
+
+The financial summary starts collapsed before dinner minus one hour and automatically opens at that threshold, including when the page stays open. A full-width divider with an up/down chevron toggles it manually; automatic opening happens once per selected gathering so later manual collapse is respected.
+
+Course budgets use max(0, confirmed people minus confirmed unannounced people minus 3), split €2/€3/€2. Unannounced parties and their extra guests still count toward attendance/capacity and actual recorded payments/costs; they do not increase the grocery budget.
+
+Financial-summary expansion is remembered per gathering in tab session storage (UI preference only), including full-page form saves. Data refreshes do not reset its state; manual collapse stays collapsed.
+
+Chef-cost Saving… feedback uses the shared top notification, stays visible while pending, then becomes the temporary Saved notification after success.
+
+Mobile participant cards extend toward the screen edges. Each row keeps identity, status, currency and checkbox controls beside each other; roles sit below names, and payment/reimbursement labels sit above the right-aligned checkbox to preserve room and readable labels.

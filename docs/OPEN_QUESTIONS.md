@@ -23,3 +23,9 @@ Pending organizer workflow clarification: which fields are maintained in the Goo
 Resolved 15 October: payment checkbox/amount corrections remain available while identity data exists, including after 19:00. Status restoration preserves existing limits and waiting-list contact rules. Additional-guests field excludes the registrant; extras are €7 guests, role applies to the lead only, and group confirmation/wait-list status is atomic. Remaining document workflow/import questions are not resolved by this slice.
 
 Resolved 15 October: chefs pay first and are reimbursed for actual ingredient costs. The budget is an estimate; the gathering's recorded balance is actual received payments minus actual chef costs, with outstanding reimbursement and cash shown separately. Long-term accounting/export and document workflow remain outside this increment.
+
+Resolved: additional organizer-entered dietary reports supplement website reports at gathering level, with confirmation of participant agreement and +24h deletion. Empty-state wording is No allergens reported (mobile No reports), not an allergy-free claim.
+
+Resolved: Add person defaults to WhatsApp with an Unannounced alternative. The quick-add flow no longer asks for override reasons or an extra acknowledgement. Organizer addition accommodates the whole party atomically; existing waiting-list priority remains unchanged.
+
+Resolved status refinements: no-show from gathering-day midnight; no new organizer undecided selections; auto-cancel undecided at Saturday 16:00; only offer new waiting-list status at full capacity. Existing capacity/contact/meal rules still govern restoring Confirmed.

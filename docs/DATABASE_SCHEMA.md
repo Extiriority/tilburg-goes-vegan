@@ -48,3 +48,11 @@ Migrations 0007/0008: nullable paid_at, nonnegative integer paid_amount_cents an
 Migration 0009 adds previous_status to both participant tables for safe cancellation reversal. It is retained only with the participant row and is deleted at the same identity deadline; it contains an enum-like state, never names or payment details.
 
 Migration 0010 adds chef_cost_cents and chef_reimbursed_cents (nonnegative integers, default zero), plus nullable chef_cost_recorded_at on registrations. Trigger guards enforce integer cents. A separate recorded timestamp distinguishes unknown costs from actual zero cost. Expense corrections preserve reimbursed cents. All three fields cascade away through participant deletion at the identity deadline; audits carry no amounts or participant text.
+
+Structured dietary input uses a TGV_DIETARY_V1-prefixed JSON value within dietary_notes (canonical allergen IDs, Other, preparation and optional legacy text). Existing plain text remains readable. No new column, migration or retention path is introduced.
+
+Migration 0011_short_whiplash adds gathering_dietary: one event-keyed notes value, optimistic version and UTC updated_at. Notes use the same structured dietary encoding; no participant identifiers. Cascade on event deletion, hide and delete at scheduled end +24h.
+
+Migration 0012_damp_frog_thor adds walk_in_guests.source (WhatsApp/unannounced for new quick adds; legacy rows retain other). Existing override columns remain compatible: quick-add accommodation stores a system-generated source reason, never asks for participant/private text. Source is deleted with the walk-in at +7 days.
+
+Migration 0013_naive_vapor adds role (legacy default guest), chef_cost_cents, chef_reimbursed_cents and chef_cost_recorded_at to walk_in_guests. Rebuilt confirmed_participants exposes stored organizer roles. Added role/expense validity and combined volunteer-slot trigger guards. Preserve these custom SQL definitions in later migrations.

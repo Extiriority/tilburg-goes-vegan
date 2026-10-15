@@ -2,6 +2,70 @@
 
 ## 2026-10-15
 
+- Simplified the organizer allergen editor with a shorter heading, removed introductory copy and tighter checkbox spacing while retaining touch targets.
+
+- Kept the gathering label, selector and accessible calendar-plus add button on one line on desktop and mobile.
+
+- Tucked the venue line directly below the gathering date beside the edit button for a more compact heading.
+
+- Shortened gathering-card dates to weekday/day/abbreviated month and muted the smaller venue line, hiding its postal code without changing stored addresses.
+
+- Widened mobile participant cards and kept names, status, amounts and payment controls on one compact row, with roles below names and payment labels above the right-aligned checkboxes.
+
+- Styled the Saving… notification with the existing blue palette; Saved remains green.
+
+- Moved chef-cost Saving… feedback into the same top notification as Saved, keeping it visible while the request is pending.
+
+- Preserved financial-summary expansion through saves, cost updates and page reloads within the same tab, separately for each gathering.
+
+- Excluded confirmed unannounced parties (including extra guests) from course budgets while retaining them in attendance and actual finances.
+
+- Made the gathering financial summary collapsible using a full-width divider and chevron, opening automatically one hour before dinner while retaining manual control.
+
+- Moved organizer save feedback into a top-of-screen notification that fades away after three seconds, and gathering editing into an accessible icon button beside its title.
+
+- Restored the NL/EN switch beside compact admin navigation, with instant updates and persisted preference without reloading forms.
+
+- Added Coconut/Kokos as an extra organizer allergen choice with its own green SVG gathering chip.
+
+- Restored original desktop chip spacing and increased text padding on mobile only.
+
+- Restored previous gathering-chip padding and added spacing around chip text rather than icons.
+
+- Removed duplicate focus outlines from organizer amount fields and reduced their width, retaining one visible green focus border.
+
+- Added a little horizontal padding to all gathering-card chips across desktop and mobile.
+
+- Restored No report text beside the empty-allergen icon at every mobile width.
+
+- Shortened the generic organizer save error to Could not save, try again, with matching Dutch copy.
+
+- Corrected estimated course budgets to max(0, confirmed people minus 3) × €2/€3/€2, matching the organizer’s reference table.
+
+- Enlarged the No allergens reported icon to 24px.
+
+- Added a decorative crossed-out allergen SVG to the empty dietary chip on desktop and mobile, with an accessible label at narrow widths.
+
+- Kept only confirmed entries in Participants and combined all remaining statuses in one separate Other registrations card below.
+
+- Hid the WhatsApp source label beside participant names while retaining the saved source.
+
+- Made Add person and existing participant editors mutually exclusive: opening one closes the other.
+
+- Shortened the Add person field label to Extra guests.
+
+- Wrapped participants in a matching card and moved Add person into an accessible icon toggle beside its title; repeated-entry behavior remains intact.
+
+- Add person now saves without page navigation, stays open, preserves source, and clears/refocuses the name for repeated entries; failed submissions retain inputs.
+
+- Compact SVG-only organizer navigation with accessible names/tooltips; removed the public-site back link and moved logout into Overview.
+
+- Removed the extra Allergens chip: existing allergen chips open the editor, and collapsing its dietary section closes the whole editor.
+
+- Shortened the gathering allergen chip to Gluten while keeping Gluten-containing cereals as the form label.
+
+- Replaced all allergen emojis/bullets with locally hosted Erudus SVGs in green; retained text labels and the MIT license.
+
 - Highlighted outstanding reimbursements in yellow until the amount reaches zero, including during live cost previews.
 
 - Removed per-chef Saving text; retained shared gathering feedback and inline errors.
@@ -118,3 +182,21 @@
 - Unified chef/payment amount fields with € prefixes and right alignment; removed the visible Cost label and cash-explanation paragraph. Captured desktop/mobile previews with 16 synthetic participants including 3 chefs, then removed the test gathering and participants. Type and 320/390px layout checks pass; real records preserved, nothing deployed.
 
 - Grouped chefs first with a thicker final divider; matched expense/payment number sizes and checkbox alignment.
+
+- Moved dietary/allergy information to a gathering-level summary; omitted person-linked dietary fields from the combined response, and simplified seat/budget chips.
+
+- Added bilingual multi-select allergen fields to signup/private management, ingredient-only Other and preparation fields, consent validation and backward-compatible dietary storage. Gathering summaries show labeled allergen chips; all 14 categories remain available, with five animal-derived allergens collapsed for cross-contact.
+
+- Collapsed optional dietary fields by default; combined Other/preparation text inside Other allergens, preserving existing values and opening sections for editing/errors.
+
+- Added compact gathering dietary editing for external poll reports, with consent confirmation and separate versioned storage. Combined summaries preserve website entries; +24h hiding/deletion covers both. Local migration 0011, 89 tests, 320/375px layout verification; nothing deployed.
+
+- Added compact status icon pickers with full-name/icon menus, keyboard navigation, accessible labels, disabled choices and native no-JavaScript fallback; existing status saves/rules preserved.
+
+- Simplified Add person to name, additional guests and WhatsApp/Unannounced source. Removed long explanations/override-reason UI; quick additions atomically accommodate whole groups after cutoff and record source. Local migration 0012; 90 tests and type checks pass. Nothing deployed.
+
+- Added organizer role selection and side-by-side Name/Additional guests. Organizer chefs/helpers share website role limits; chef expenses/reimbursements work across both sources. Migration 0013 local only; 92 tests and mobile/type checks pass.
+
+- Enabled no-show from gathering-day midnight, added unpaid Missing amounts and hid cancelled financial controls. Grouped waiting/no-show/cancelled rows below the main list. Restricted new undecided/waiting choices and added atomic cutoff expiry of undecided bookings with deduplicated queued notifications. 96 tests and browser/type checks pass; no deployment.
+
+- Replaced locale-dependent gathering datetime controls with explicit 24-hour time entry for editing and creation. Preserved Amsterdam scheduling; focused tests, type checks and mobile browser validation pass.

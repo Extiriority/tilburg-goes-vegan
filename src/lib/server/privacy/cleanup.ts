@@ -37,9 +37,11 @@ export async function cleanupPrivacy(db: D1Database, now = Date.now()) {
         db.prepare('UPDATE privacy_cleanup_runs SET affected_rows=affected_rows+changes() WHERE id=?').bind(identityRunId)
       );
     }
+    statements.push(db.prepare(`DELETE FROM gathering_dietary WHERE event_id IN (${eligible})`).bind(event.id, now - DAY));
     const results = await db.batch(statements);
     dietaryRows += results[0].meta.changes;
-    if (statements.length > 2) {
+    dietaryRows += results[results.length - 1].meta.changes;
+    if (event.ends_at <= now - 7 * DAY) {
       deletedEmails += results[2].results.length;
       deletedRegistrations += results[3].results.length + results[5].results.length;
     }

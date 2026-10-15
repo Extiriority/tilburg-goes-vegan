@@ -1,4 +1,5 @@
 <script lang="ts">
+  import DietaryFields from '$lib/components/DietaryFields.svelte';
   import { enhance } from '$app/forms';
   import { tick } from 'svelte';
   import type { SubmitFunction } from '@sveltejs/kit';
@@ -165,16 +166,7 @@
             <input type="hidden" name="version" value={registration.version} />
 
             <div class="form-grid">
-              <label class="full">
-                {t.dietary}
-                <textarea
-                  name="dietaryNotes"
-                  rows="3"
-                  maxlength="2000"
-                  value={registration.dietary_notes ?? ''}
-                ></textarea>
-              </label>
-
+              <DietaryFields nl={$locale === 'nl'} notes={registration.dietary_notes} invalid={form?.managementError === 'invalid'} error={r.fields.dietaryNotes} />
               <label class="consent full">
                 <input
                   type="checkbox"

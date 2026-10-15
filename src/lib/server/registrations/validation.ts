@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { readDietaryForm } from '$lib/dietary';
 
 const optionalText = (max: number) => z.string().trim().max(max).transform(value => value || null);
 export const registrationInput = z.object({
@@ -28,7 +29,7 @@ export type DetailsInput = z.infer<typeof detailsInput>;
 export function readRegistrationForm(form: FormData) {
   return registrationInput.safeParse({
     eventId: form.get('eventId'), fullName: form.get('fullName'), email: form.get('email'), role: form.get('role'), language: form.get('language'),
-    extraGuests: form.get('extraGuests') ?? 0, undecided: form.get('undecided') === 'on', dietaryNotes: form.get('dietaryNotes') ?? '', dietaryConsent: form.get('dietaryConsent') === 'on',
+    extraGuests: form.get('extraGuests') ?? 0, undecided: form.get('undecided') === 'on', dietaryNotes: readDietaryForm(form), dietaryConsent: form.get('dietaryConsent') === 'on',
     comments: form.get('comments') ?? '', submissionToken: form.get('submissionToken')
   });
 }

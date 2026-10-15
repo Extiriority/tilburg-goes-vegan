@@ -23,3 +23,13 @@ Organizer-only walk-ins require only a name, with optional operational comments 
 Group bookings store only the lead registrant's identity and the number of additional guests. On-site paid timestamp/amount (integer cents) is linked to that registration and removed at the same scheduled-end +7-day deadline, including cancelled gatherings; no payment history is copied to anonymous audit rows. Amount corrections stay available while the identity row exists. No card/bank details or payment-provider integration are collected.
 
 Actual chef costs and reimbursement amounts are stored with the participant record and deleted at scheduled dinner end +7×24 hours, including cancelled gatherings. They are excluded from expired organizer responses and never copied to audit payloads. No receipt uploads, bank/card details or indefinite financial history are introduced.
+
+Organizer dietary information is now shown at gathering level for confirmed bookings only, deduplicated and without registration identifiers or person-linked fields in the combined panel response. Free text can still identify someone; this is not guaranteed anonymization. Existing consent and +24h retention still apply.
+
+Structured allergen choices reduce unnecessary free text; optional Other/preparation text instructs visitors not to include names or medical history. Gathering summaries show category presence, deduplicated details, no participant links/counts, and exclude non-confirmed bookings. This does not guarantee anonymity. Explicit consent and +24h dietary purge apply to the entire structured value, including legacy notes.
+
+Organizer-entered external poll dietary requirements require explicit confirmation of participant agreement. Store them only at gathering level, without names or source-poll links. Cleanup deletes gathering_dietary at scheduled dinner end +24h including cancelled gatherings; queries hide expired data even before cleanup. Audit records contain only action, event and organizer IDs, not dietary text.
+
+Quick-add source is a minimal category (WhatsApp or unannounced), without poll links, messages or extra contact data. It follows the walk-in identity's scheduled-end +7-day deletion. System accommodation reason contains only the source category.
+
+Organizer chef roles and cost/reimbursement fields remain on walk_in_guests and are deleted with identity at scheduled dinner end +7 days. No email, receipt uploads or permanent financial history are introduced.

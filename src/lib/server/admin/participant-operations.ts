@@ -72,6 +72,7 @@ export async function changeParticipantStatus(
       .first());
   const oldStatus = absent ? 'no_show' : person.status;
   if (oldStatus === input.status) return;
+  if (input.status === 'undecided') throw new AdminError('Undecided is only available for existing registrations.');
   if (input.status === 'no_show') {
     await markAttendance(db, admin, input.id, input.version, true, now);
     return;
@@ -109,7 +110,7 @@ export async function changeParticipantStatus(
     freezeMealAllocation(db, person.event_id, now),
     db
       .prepare(
-        `UPDATE ${table} SET previous_status=?,status=?,version=version+1,updated_at=? WHERE id=? AND version=? AND status=? ${walkIn ? '' : 'AND anonymized_at IS NULL'} AND EXISTS(SELECT 1 FROM events e WHERE e.id=event_id AND e.status='scheduled' AND e.ends_at>MAX(?,${SQL_NOW}) AND (e.registration_cutoff>MAX(?,${SQL_NOW}) OR e.meal_allocation IS NOT NULL) ${confirmation})`,
+        `UPDATE ${table} SET previous_status=?,status=?,version=version+1,updated_at=? WHERE id=? AND version=? AND status=? ${walkIn ? '' : 'AND anonymized_at IS NULL'} AND EXISTS(SELECT 1 FROM events e WHERE e.id=event_id AND e.status='scheduled' AND e.ends_at>MAX(?,${SQL_NOW}) AND (e.registration_cutoff>MAX(?,${SQL_NOW}) OR e.meal_allocation IS NOT NULL) ${input.status === 'waiting_list' ? "AND (SELECT COALESCE(sum(seats),0) FROM confirmed_participants WHERE event_id=e.id)>=e.capacity" : ''} ${confirmation})`,
       )
       .bind(
         oldStatus,

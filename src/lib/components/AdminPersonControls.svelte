@@ -1,12 +1,15 @@
 <script lang="ts">
   import AdminChefExpenses from '$lib/components/AdminChefExpenses.svelte';
+  import ParticipantStatusPicker from './ParticipantStatusPicker.svelte';
+  import { tick } from 'svelte';
   import { enhance } from '$app/forms';
   import type { SubmitFunction } from '@sveltejs/kit';
   let {
     person,
     eventId,
     nl,
-    startsAt,
+    attendanceOpensAt,
+    full,
     now,
     cancelled,
     onCostPreview,
@@ -27,7 +30,8 @@
     };
     eventId: string;
     nl: boolean;
-    startsAt: number;
+    attendanceOpensAt: number;
+    full: boolean;
     now: number;
     cancelled: boolean;
     onCostPreview?: (id: string, cents: number | null, saving: boolean) => void;
@@ -38,6 +42,7 @@
     paid = $state(false),
     amount = $state(''),
     contacted = $state(false);
+  let statusForm: HTMLFormElement;
   let fee = $derived((person.extra_guests + (person.role === 'chef' ? 0 : 1)) * 7);
   $effect(() => {
     selected = person.status;
@@ -78,6 +83,7 @@
   aria-busy={pending}
 >
   <form
+    bind:this={statusForm}
     class="admin-status-form"
     method="POST"
     action={`?event=${encodeURIComponent(eventId)}&/status`}
@@ -88,19 +94,14 @@
       name="version"
       value={person.version}
     />
-    <select
-      name="status"
-      class="participant-status status-{person.status}"
-      aria-label={`${nl ? 'Status van' : 'Status for'} ${person.full_name}`}
-      bind:value={selected}
+    <ParticipantStatusPicker value={selected} label={`${nl ? 'Status van' : 'Status for'} ${person.full_name}`}
       disabled={pending || cancelled}
-      onchange={(event) => event.currentTarget.form?.requestSubmit()}
-    >
-      {#each Object.entries(labels) as [status, label]}{#if !person.walk_in || !['waiting_list', 'undecided'].includes(status)}<option
-            value={status}
-            disabled={status === 'no_show' && startsAt > now}>{label[nl ? 0 : 1]}</option
-          >{/if}{/each}
-    </select>
+      options={Object.entries(labels).filter(([status]) =>
+        (!person.walk_in || !['waiting_list','undecided'].includes(status)) &&
+        (status !== 'undecided' || person.status === 'undecided') &&
+        (status !== 'waiting_list' || full || person.status === 'waiting_list')
+      ).map(([value, label]) => ({ value, label: label[nl ? 0 : 1], disabled: value === 'no_show' && (attendanceOpensAt > now || !['confirmed','no_show'].includes(person.status)) }))}
+      onSelect={async (value) => { selected = value; await tick(); statusForm.requestSubmit(); }} />
     {#if person.status === 'waiting_list'}<label class="admin-contacted-check"
         ><input type="checkbox" name="contacted" bind:checked={contacted} disabled={pending} />{nl
           ? 'Gesproken'
@@ -108,13 +109,14 @@
       >{/if}
     <noscript><button>{nl ? 'Status opslaan' : 'Save status'}</button></noscript>
   </form>
-  {#if person.role === 'chef' || person.chef_cost_recorded_at !== null}<AdminChefExpenses
+  {#if person.status !== 'cancelled' && (person.role === 'chef' || person.chef_cost_recorded_at !== null)}<AdminChefExpenses
       {person}
       {eventId}
       {nl}
       {onCostPreview}
     />{/if}
-  {#if fee > 0 || person.paid_at !== null}
+  {#if person.status === 'no_show'}<span class="admin-missing-payment">{nl ? 'Ontbreekt' : 'Missing'} {new Intl.NumberFormat(nl ? 'nl-NL' : 'en-GB', {style:'currency',currency:'EUR'}).format(Math.max(0, fee * 100 - person.paid_amount_cents) / 100)}</span>
+  {:else if person.status !== 'cancelled' && (fee > 0 || person.paid_at !== null)}
     <form
       method="POST"
       action={`?event=${encodeURIComponent(eventId)}&/payment`}

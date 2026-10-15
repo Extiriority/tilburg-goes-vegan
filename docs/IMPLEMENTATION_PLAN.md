@@ -27,3 +27,11 @@ Completed local admin increment: combined gathering/participant view, status ord
 15 October increment: confirmed-person heading, instant status dropdowns with constrained reversals, local on-site payment checkbox/amount, and all-or-nothing group registrations. Verify concurrent grouped capacity, fixed meal ceilings, unchanged volunteer slot limits, stale writes, restoration rejection, payment correction after 19:00 and seven-day deletion before local migration. No deployment.
 
 Local actual-cost increment: remove per-status count chips, add chef actual-cost/reimbursement controls and an actual-money balance. Migration 0010 is applied locally. Verified stale writes, cost correction without rewriting reimbursement, missing/zero costs, cancelled-record inclusion and seven-day deletion; 81 tests pass. No deployment.
+
+Implemented local organizer gathering dietary editor, separate atomic versioned storage, combined website/external summaries and +24h deletion. Migration 0011 applied locally; 89 tests pass. No deployment.
+
+Quick-add organizer increment complete: compact name/group/source fields, automatic atomic whole-party accommodation after cutoff, source display and additive local migration 0012. 90 tests pass; no deployment.
+
+Local organizer role increment complete: shared volunteer slots, organizer chef expense bookkeeping and compact name/group/role/source layout. Local migration 0013 applied; 92 tests pass and type checks are clean. No deployment.
+
+Implemented status/deadline refinements with exact gathering-day midnight and cutoff tests, notification atomicity/idempotency, grouped lists and revised payment displays. Local operations sweep and authenticated admin/private-page catch-up handle undecided expiry. 96 tests pass. Production scheduling and email delivery remain pending; no deployment.

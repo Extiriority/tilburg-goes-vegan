@@ -9,7 +9,7 @@ import {
   saturdayCutoff,
   localInput,
 } from './service';
-import { freezeMealAllocation } from '../events/waiting-list';
+import { freezeMealAllocation, mondayStartsAt } from '../events/waiting-list';
 const SQL_NOW = "CAST(strftime('%s','now') AS INTEGER)*1000";
 export const walkInInput = z
   .object({
@@ -17,11 +17,14 @@ export const walkInInput = z
     eventId: z.string().min(1).max(100),
     extraGuests: z.coerce.number().int().min(0).max(99).default(0),
     fullName: z.string().trim().min(1).max(160),
+    source: z.enum(['whatsapp', 'unannounced']).optional(),
+    role: z.enum(['guest', 'helper_chef', 'chef']).default('guest'),
     override: z.enum(['on']).optional(),
     reason: z.string().trim().max(500).default(''),
   })
-  .refine((v) => !v.override || v.reason.length > 0);
+  .refine((v) => !!v.source || !v.override || v.reason.length > 0);
 export const walkInEdit = z.object({
+  role: z.enum(['guest', 'helper_chef', 'chef']).optional(),
   id: z.string().min(1).max(100),
   version: z.coerce.number().int().min(0),
   extraGuests: z.coerce.number().int().min(0).max(99).optional(),
@@ -37,16 +40,18 @@ export async function addWalkIn(
   now = Date.now(),
 ) {
   const size = 1 + (input.extraGuests ?? 0);
+  const accommodate = !!input.source || !!input.override;
+  const reason = input.source ? `Organizer accommodation: ${input.source}` : input.reason;
   const id = `walk-in:${input.id}`;
   const existing = await db
-    .prepare('SELECT event_id,full_name,extra_guests FROM walk_in_guests WHERE id=?')
+    .prepare('SELECT event_id,full_name,extra_guests,source,role FROM walk_in_guests WHERE id=?')
     .bind(id)
-    .first<{ event_id: string; full_name: string; extra_guests: number }>();
+    .first<{ event_id: string; full_name: string; extra_guests: number; source: string; role: string }>();
   if (existing) {
     if (
       existing.event_id !== input.eventId ||
       existing.full_name !== input.fullName ||
-      existing.extra_guests !== (input.extraGuests ?? 0)
+      existing.extra_guests !== (input.extraGuests ?? 0) || existing.source !== (input.source ?? 'other') || existing.role !== input.role
     )
       throw new AdminError('Submission already used. Reload first.');
     return;
@@ -60,19 +65,19 @@ export async function addWalkIn(
   if (!event) throw new AdminError('Gathering no longer exists.');
   const promotionEnds = parseLocal(`${localInput(event.starts_at).slice(0, 10)}T19:00`);
   const statements = [freezeMealAllocation(db, input.eventId, now)];
-  if (input.override)
+  if (accommodate)
     statements.push(
       db
         .prepare(
-          `UPDATE events SET capacity=MAX(capacity,${count}+${size}),meal_allocation=CASE WHEN meal_allocation IS NULL THEN NULL ELSE MAX(meal_allocation,${count}+1) END,version=version+1 WHERE id=? AND status='scheduled' AND ends_at>MAX(?,${SQL_NOW}) AND NOT EXISTS(SELECT 1 FROM walk_in_guests WHERE id=?)`,
+          `UPDATE events SET capacity=MAX(capacity,${count}+${size}),meal_allocation=CASE WHEN meal_allocation IS NULL THEN NULL ELSE MAX(meal_allocation,${count}+${size}) END,version=version+1 WHERE id=? AND status='scheduled' AND ends_at>MAX(?,${SQL_NOW}) AND NOT EXISTS(SELECT 1 FROM walk_in_guests WHERE id=?)`,
         )
         .bind(input.eventId, now, id),
     );
   statements.push(
     db
       .prepare(
-        `INSERT INTO walk_in_guests (id,event_id,full_name,status,limits_overridden,override_reason,created_at,updated_at,extra_guests)
-    SELECT ?,id,?,'confirmed',?,?,?,?,? FROM events WHERE id=? AND status='scheduled' AND ends_at>MAX(?,${SQL_NOW})
+        `INSERT INTO walk_in_guests (id,event_id,full_name,status,limits_overridden,override_reason,created_at,updated_at,extra_guests,source,role)
+    SELECT ?,id,?,'confirmed',?,?,?,?,?,?,? FROM events WHERE id=? AND status='scheduled' AND ends_at>MAX(?,${SQL_NOW})
     AND (registration_cutoff>MAX(?,${SQL_NOW}) OR meal_allocation IS NOT NULL)
     AND NOT EXISTS(SELECT 1 FROM walk_in_guests WHERE id=?)
     AND NOT EXISTS(SELECT 1 FROM registrations r WHERE r.event_id=events.id AND r.status='waiting_list' AND (r.role='guest' OR (SELECT count(*) FROM confirmed_participants c WHERE c.event_id=r.event_id AND c.role=r.role)<3) AND MAX(?,${SQL_NOW})<?)`,
@@ -80,11 +85,13 @@ export async function addWalkIn(
       .bind(
         id,
         input.fullName,
-        input.override ? 1 : 0,
-        input.reason || null,
+        accommodate ? 1 : 0,
+        reason || null,
         now,
         now,
         input.extraGuests ?? 0,
+        input.source ?? 'other',
+        input.role,
         input.eventId,
         now,
         now,
@@ -101,7 +108,7 @@ export async function addWalkIn(
       db,
       admin,
       input.eventId,
-      input.override ? 'walk_in_added_with_override' : 'walk_in_added',
+      accommodate ? 'walk_in_added_with_override' : 'walk_in_added',
       now,
     ),
   ]);
@@ -116,12 +123,13 @@ export async function editWalkIn(
   await batch(db, [
     db
       .prepare(
-        `UPDATE walk_in_guests SET full_name=?,comments=?,extra_guests=COALESCE(?,extra_guests),version=version+1,updated_at=? WHERE id=? AND version=? AND EXISTS(SELECT 1 FROM events WHERE id=event_id AND ends_at>MAX(?,${SQL_NOW}) AND status='scheduled')`,
+        `UPDATE walk_in_guests SET full_name=?,comments=?,extra_guests=COALESCE(?,extra_guests),role=COALESCE(?,role),version=version+1,updated_at=? WHERE id=? AND version=? AND EXISTS(SELECT 1 FROM events WHERE id=event_id AND ends_at>MAX(?,${SQL_NOW}) AND status='scheduled')`,
       )
       .bind(
         input.fullName,
         input.comments || null,
         input.extraGuests ?? null,
+        input.role ?? null,
         now,
         input.id,
         input.version,
@@ -142,23 +150,22 @@ export async function markAttendance(
   const walkIn = id.startsWith('walk-in:');
   const table = walkIn ? 'walk_in_guests' : 'registrations';
   const person = await db
-    .prepare(`SELECT event_id FROM ${table} WHERE id=?`)
+    .prepare(`SELECT p.event_id,e.starts_at FROM ${table} p JOIN events e ON e.id=p.event_id WHERE p.id=?`)
     .bind(id)
-    .first<{ event_id: string }>();
+    .first<{ event_id: string; starts_at: number }>();
   if (!person) throw new AdminError('Registration no longer exists');
   const statements = [
     freezeMealAllocation(db, person.event_id, now),
     db
       .prepare(
-        `UPDATE ${table} SET previous_status=status,status=?,version=version+1,updated_at=? WHERE id=? AND version=? AND status='confirmed' AND EXISTS(SELECT 1 FROM events WHERE id=event_id AND status='scheduled' AND ${noShow ? `starts_at<=MIN(?,${SQL_NOW}) AND ends_at+604800000>MAX(?,${SQL_NOW})` : `ends_at>MAX(?,${SQL_NOW})`})`,
+        `UPDATE ${table} SET previous_status=status,status=?,version=version+1,updated_at=? WHERE id=? AND version=? AND status='confirmed' AND EXISTS(SELECT 1 FROM events WHERE id=event_id AND status='scheduled' AND ${noShow ? `?<=MIN(?,${SQL_NOW}) AND ends_at+604800000>MAX(?,${SQL_NOW})` : `ends_at>MAX(?,${SQL_NOW})`})`,
       )
       .bind(
         walkIn && noShow ? 'no_show' : 'cancelled',
         now,
         id,
         version,
-        now,
-        ...(noShow ? [now] : []),
+        ...(noShow ? [mondayStartsAt(person.starts_at), now, now] : [now]),
       ),
     receipt(db, now),
   ];

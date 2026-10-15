@@ -480,6 +480,21 @@ it('preserves waiting-list priority, and failed overrides roll back raised limit
   expect(await count('walk_in_guests')).toBe(1);
 });
 
+it('quick-adds WhatsApp and unannounced parties after cutoff without asking for override reasons', async () => {
+  await signup('booked');
+  clock = starts + 1;
+  await db.prepare("UPDATE events SET capacity=1,meal_allocation=1 WHERE id='e'").run();
+  const whatsapp = walkIn({ source: 'whatsapp', extraGuests: 2 });
+  await addWalkIn(timed, 'admin', whatsapp, clock);
+  await addWalkIn(timed, 'admin', whatsapp, clock);
+  expect(await db.prepare("SELECT capacity,meal_allocation FROM events WHERE id='e'").first()).toEqual({capacity:4,meal_allocation:4});
+  await addWalkIn(timed, 'admin', walkIn({ source: 'unannounced' }), clock);
+  expect(await db.prepare("SELECT capacity,meal_allocation FROM events WHERE id='e'").first()).toEqual({capacity:5,meal_allocation:5});
+  expect((await db.prepare('SELECT source FROM walk_in_guests ORDER BY created_at,id').all()).results.map(row=>row.source).sort()).toEqual(['unannounced','whatsapp']);
+  await expect(addWalkIn(timed,'admin',{...whatsapp,source:'unannounced'},clock)).rejects.toThrow();
+  expect(await count('email_outbox')).toBe(0);
+});
+
 it('freezes meals including walk-ins and rejects stale edits and additions after dinner', async () => {
   const input = walkIn();
   await addWalkIn(timed, 'admin', input, clock);
@@ -589,8 +604,8 @@ it('defaults to the next gathering, combines both participant types and orders b
     'confirmed',
     'confirmed',
     'waiting_list',
-    'undecided',
     'no_show',
+    'cancelled',
     'cancelled',
   ]);
   expect(data.people.find((r) => r.walk_in)?.email_normalized).toBeNull();
@@ -598,12 +613,11 @@ it('defaults to the next gathering, combines both participant types and orders b
   expect(data.counts).toEqual({
     confirmed: 2,
     waiting_list: 1,
-    undecided: 1,
     no_show: 1,
-    cancelled: 1,
+    cancelled: 2,
   });
   expect(data.selected?.confirmed).toBe(2);
-  expect(data.selected?.budget).toEqual({ starter: 4, main: 6, dessert: 4 });
+  expect(data.selected?.budget).toEqual({ starter: 0, main: 0, dessert: 0 });
   const overview = await overviewLoad(request as unknown as Parameters<typeof overviewLoad>[0]);
   expect(overview.counts.find((r) => r.status === 'confirmed')?.total).toBe(2);
   expect(overview.counts.find((r) => r.status === 'no_show')?.total).toBe(1);
@@ -786,6 +800,40 @@ import {
   chefCostInput,
   chefReimbursementInput,
 } from '../src/lib/server/admin/chef-expenses';
+
+it('shares chef role limits across website and organizer groups, including concurrent quick adds', async () => {
+  await signup('chef-one','confirmed','chef');
+  await signup('chef-two','confirmed','chef');
+  const result=await Promise.allSettled([
+    addWalkIn(timed,'admin',walkIn({source:'whatsapp',role:'chef',extraGuests:2}),clock),
+    addWalkIn(timed,'admin',walkIn({source:'whatsapp',role:'chef'}),clock),
+  ]);
+  expect(result.filter(item=>item.status==='fulfilled')).toHaveLength(1);
+  expect(await db.prepare("SELECT count(*) AS n FROM confirmed_participants WHERE role='chef'").first('n')).toBe(3);
+  await expect(addWalkIn(timed,'admin',walkIn({source:'unannounced',role:'chef'}),clock)).rejects.toThrow();
+  await expect(signup('fourth-chef','confirmed','chef')).rejects.toThrow();
+});
+
+it('records organizer chef costs and reimbursements in totals and deletes them at retention', async () => {
+  const input=walkIn({source:'whatsapp',role:'chef',extraGuests:2});
+  await addWalkIn(timed,'admin',input,clock);
+  const id=`walk-in:${input.id}`;
+  await saveChefCost(timed,'admin',chefCostInput.parse({id,version:0,amount:'12.50'}),clock);
+  await saveChefReimbursement(timed,'admin',chefReimbursementInput.parse({id,version:1,reimbursed:'on'}),clock);
+  const request={locals:{admin:{id:'admin'},locale:'en'},platform:{env:{DB:timed}},url:new URL('http://localhost/admin/events?event=e')} as never;
+  const loaded=await gatheringLoad(request);
+  expect(loaded.people[0].role).toBe('chef');
+  expect(loaded.people[0].extra_guests).toBe(2);
+  expect(loaded.selected?.confirmed).toBe(3);
+  expect(loaded.finance.costs).toBe(1250);
+  expect(loaded.finance.reimbursed).toBe(1250);
+  await expect(saveChefCost(timed,'admin',chefCostInput.parse({id,version:0,amount:'1'}),clock)).rejects.toThrow();
+  await expect(db.prepare('UPDATE walk_in_guests SET chef_cost_cents=-1 WHERE id=?').bind(id).run()).rejects.toThrow();
+  clock=starts+10800000+604800000;
+  await expect(saveChefCost(timed,'admin',chefCostInput.parse({id,version:2,amount:'1'}),clock)).rejects.toThrow();
+  await cleanupPrivacy(timed,clock);
+  expect(await count('walk_in_guests')).toBe(0);
+});
 it('uses actual chef costs for balance and preserves amounts already reimbursed when costs change', async () => {
   await signup('payer');
   await signup('chef', 'confirmed', 'chef');
@@ -894,4 +942,55 @@ it('accepts zero recorded chef costs, reports missing costs, and deletes cost/pa
   ).rejects.toThrow();
   await cleanupPrivacy(timed, clock);
   expect(await count('registrations')).toBe(0);
+});
+
+import { expireUndecided } from '../src/lib/server/events/undecided';
+it('cancels undecided at the exact cutoff with one atomic notification across retries', async()=>{
+  await signup('unsure','undecided');
+  await signup('booked');
+  clock=cutoff-1;
+  expect((await expireUndecided(timed,clock)).cancelled).toBe(0);
+  clock=cutoff;
+  const results=await Promise.all([expireUndecided(timed,clock),expireUndecided(timed,clock)]);
+  expect(results.reduce((n,r)=>n+r.cancelled,0)).toBe(1);
+  expect(await db.prepare("SELECT status FROM registrations WHERE id='unsure'").first('status')).toBe('cancelled');
+  expect(await db.prepare("SELECT count(*) AS n FROM email_outbox WHERE registration_id='unsure'").first('n')).toBe(1);
+  expect((await expireUndecided(timed,clock)).cancelled).toBe(0);
+  expect(await db.prepare("SELECT status FROM registrations WHERE id='booked'").first('status')).toBe('confirmed');
+});
+it('rolls back cutoff cancellation if its notification cannot be queued',async()=>{
+  await signup('unsure','undecided');
+  await db.prepare("CREATE TRIGGER fail_cutoff_mail BEFORE INSERT ON email_outbox BEGIN SELECT RAISE(ABORT,'test'); END").run();
+  clock=cutoff;
+  await expect(expireUndecided(timed,clock)).rejects.toThrow();
+  expect(await db.prepare("SELECT status FROM registrations WHERE id='unsure'").first('status')).toBe('undecided');
+});
+it('enables no-show exactly at Amsterdam midnight on the gathering date',async()=>{
+  await signup('absent');
+  clock=parseLocal('2026-10-26T00:00');
+  await expect(markAttendance(timed,'admin','absent',0,true,clock-1)).rejects.toThrow();
+  await markAttendance(timed,'admin','absent',0,true,clock);
+  expect(await count('registration_no_shows')).toBe(1);
+});
+it('blocks choosing undecided and only allows a new waiting-list status at full capacity',async()=>{
+  await signup('booked');
+  await expect(changeParticipantStatus(timed,'admin',statusInput.parse({id:'booked',version:0,status:'undecided'}),clock)).rejects.toThrow();
+  await expect(changeParticipantStatus(timed,'admin',statusInput.parse({id:'booked',version:0,status:'waiting_list'}),clock)).rejects.toThrow();
+  await db.prepare("UPDATE events SET capacity=1 WHERE id='e'").run();
+  await changeParticipantStatus(timed,'admin',statusInput.parse({id:'booked',version:0,status:'waiting_list'}),clock);
+  expect(await db.prepare("SELECT status FROM registrations WHERE id='booked'").first('status')).toBe('waiting_list');
+});
+
+it('matches the organizer budget table at ten and twenty people, excluding other statuses',async()=>{
+  await addWalkIn(timed,'admin',walkIn({extraGuests:9}),clock);
+  await signup('cancelled-budget','cancelled');
+  await signup('undecided-budget','undecided');
+  const request={platform:{env:{DB:timed}},locals:{admin:{id:'admin',email:'organizer@example.invalid'}},url:new URL('http://localhost/admin/events?event=e')} as unknown as Parameters<typeof gatheringLoad>[0];
+  expect((await gatheringLoad(request)).selected?.budget).toEqual({starter:14,main:21,dessert:14});
+  await addWalkIn(timed,'admin',walkIn({extraGuests:9}),clock);
+  expect((await gatheringLoad(request)).selected?.budget).toEqual({starter:34,main:51,dessert:34});
+  await addWalkIn(timed,'admin',walkIn({source:'unannounced',extraGuests:2}),clock);
+  const withUnannounced = await gatheringLoad(request);
+  expect(withUnannounced.selected?.confirmed).toBe(23);
+  expect(withUnannounced.selected?.budget).toEqual({starter:34,main:51,dessert:34});
 });

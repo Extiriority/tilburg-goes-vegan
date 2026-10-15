@@ -1,4 +1,5 @@
 <script lang="ts">
+  import DietaryFields from '$lib/components/DietaryFields.svelte';
   import { enhance } from '$app/forms';
   import { tick } from 'svelte';
   import type { SubmitFunction } from '@sveltejs/kit';
@@ -162,18 +163,7 @@
         <label class="consent full"
           ><input type="checkbox" name="undecided" /><span>{r.unsure}</span></label
         >
-        <label class="full"
-          >{t.dietary} <span class="optional">({t.optional})</span><textarea
-            name="dietaryNotes"
-            rows="2"
-            maxlength="2000"
-            aria-invalid={fields.includes('dietaryNotes')}
-            aria-describedby={fields.includes('dietaryNotes') ? 'dietaryNotes-error' : undefined}
-          ></textarea>{#if fields.includes('dietaryNotes')}<span
-              id="dietaryNotes-error"
-              class="field-error">{r.fields.dietaryNotes}</span
-            >{/if}</label
-        >
+        <DietaryFields nl={$locale === 'nl'} invalid={fields.includes('dietaryNotes')} error={r.fields.dietaryNotes} />
         <label class="consent full"
           ><input
             type="checkbox"

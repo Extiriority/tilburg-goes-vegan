@@ -26,6 +26,14 @@ export const eventEdit = z.object({
   description: text(4000),
   capacity: z.coerce.number().int().min(1).max(1000),
 });
+export function readEventForm(form: FormData) {
+  const values = Object.fromEntries(form);
+  for (const name of ['starts', 'ends']) {
+    if (form.has(`${name}Date`) || form.has(`${name}Time`))
+      values[name] = `${form.get(`${name}Date`) ?? ''}T${form.get(`${name}Time`) ?? ''}`;
+  }
+  return values;
+}
 export const recipeEdit = z.object({
   id: z.string().max(100),
   version,
@@ -131,7 +139,7 @@ export async function batch(db: D1Database, statements: D1PreparedStatement[]) {
     return await db.batch(statements);
   } catch {
     throw new AdminError(
-      'Could not save. The record changed, a limit was exceeded, or the database rejected the update. Reload and check the details.',
+      'Could not save, try again',
     );
   }
 }

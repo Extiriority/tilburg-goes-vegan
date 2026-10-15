@@ -1,6 +1,7 @@
 import { getPlatformProxy } from 'wrangler';
 import { cleanupPrivacy } from '../src/lib/server/privacy/cleanup.ts';
 import { processWaitingLists } from '../src/lib/server/events/waiting-list.ts';
+import { expireUndecided } from '../src/lib/server/events/undecided.ts';
 
 const args = process.argv.slice(2);
 if (args.some(arg => arg !== '--watch')) throw new Error('Only --watch is supported; this command is local-only.');
@@ -19,7 +20,7 @@ process.once('SIGTERM', stop);
 async function run() {
   running = true;
   try {
-    const cleanup = await cleanupPrivacy(proxy.env.DB); const waitingList = await processWaitingLists(proxy.env.DB); const result = {cleanup,waitingList};
+    const cleanup = await cleanupPrivacy(proxy.env.DB); const undecided = await expireUndecided(proxy.env.DB); const waitingList = await processWaitingLists(proxy.env.DB); const result = {cleanup,undecided,waitingList};
     console.log('Local operations:', result);
   } catch {
     console.error('Local operations failed. Check local migrations and database access.');

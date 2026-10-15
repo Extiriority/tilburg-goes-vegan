@@ -14,6 +14,7 @@ import { adminFail } from '$lib/server/admin/feedback';
 import { requireAdmin } from '$lib/server/admin/auth';
 import {
   eventEdit,
+  readEventForm,
   saveEvent,
   cancelEvent,
   localInput,
@@ -31,11 +32,15 @@ import {
   uniqueGathering,
 } from '$lib/server/admin/gathering-participants';
 import { z } from 'zod';
+import { expireUndecided } from '$lib/server/events/undecided';
+import { mondayStartsAt } from '$lib/server/events/waiting-list';
+import { getGatheringDietary, saveGatheringDietary } from '$lib/server/admin/gathering-dietary';
 export const load = async (event: import('./$types').PageServerLoadEvent) => {
   const { db } = requireAdmin(event);
+  await expireUndecided(db);
   const rows = await db
     .prepare(
-      "SELECT e.*,v.name AS venue,v.address,(SELECT COALESCE(sum(seats),0) FROM confirmed_participants WHERE event_id=e.id AND status='confirmed') AS confirmed FROM events e JOIN venues v ON v.id=e.venue_id WHERE e.ends_at+604800000>? ORDER BY e.starts_at,e.id",
+      "SELECT e.*,v.name AS venue,v.address,(SELECT COALESCE(sum(seats),0) FROM confirmed_participants WHERE event_id=e.id AND status='confirmed') AS confirmed,(SELECT COALESCE(sum(1+extra_guests),0) FROM walk_in_guests WHERE event_id=e.id AND status='confirmed' AND source='unannounced') AS unannounced FROM events e JOIN venues v ON v.id=e.venue_id WHERE e.ends_at+604800000>? ORDER BY e.starts_at,e.id",
     )
     .bind(Date.now())
     .all<{
@@ -50,6 +55,7 @@ export const load = async (event: import('./$types').PageServerLoadEvent) => {
       version: number;
       meal_allocation: number | null;
       confirmed: number;
+      unannounced: number;
     }>();
   const now = Date.now();
   const requested = event.url.searchParams.get('event');
@@ -61,9 +67,9 @@ export const load = async (event: import('./$types').PageServerLoadEvent) => {
     1,
     Math.floor(Math.min(100000, Number(event.url.searchParams.get('page')) || 1)),
   );
-  const union = `SELECT r.id,r.event_id,r.full_name,r.email_normalized,r.role,CASE WHEN n.registration_id IS NOT NULL THEN 'no_show' ELSE r.status END AS status,r.comments,r.version,r.created_at,r.paid_at,r.paid_amount_cents,r.extra_guests,r.chef_cost_cents,r.chef_reimbursed_cents,r.chef_cost_recorded_at,CASE WHEN e.ends_at+86400000>? THEN r.dietary_notes ELSE NULL END AS dietary_notes,0 AS walk_in
+  const union = `SELECT r.id,r.event_id,r.full_name,r.email_normalized,r.role,CASE WHEN n.registration_id IS NOT NULL THEN 'no_show' ELSE r.status END AS status,r.comments,r.version,r.created_at,r.paid_at,r.paid_amount_cents,r.extra_guests,r.chef_cost_cents,r.chef_reimbursed_cents,r.chef_cost_recorded_at,CASE WHEN e.ends_at+86400000>? THEN r.dietary_notes ELSE NULL END AS dietary_notes,0 AS walk_in,'website' AS source
     FROM registrations r JOIN events e ON e.id=r.event_id LEFT JOIN registration_no_shows n ON n.registration_id=r.id WHERE r.event_id=? AND r.anonymized_at IS NULL AND e.ends_at+604800000>?
-    UNION ALL SELECT w.id,w.event_id,w.full_name,NULL,'guest',w.status,w.comments,w.version,w.created_at,w.paid_at,w.paid_amount_cents,w.extra_guests,0,0,NULL,NULL,1 FROM walk_in_guests w JOIN events e ON e.id=w.event_id WHERE w.event_id=? AND e.ends_at+604800000>?`;
+    UNION ALL SELECT w.id,w.event_id,w.full_name,NULL,w.role,w.status,w.comments,w.version,w.created_at,w.paid_at,w.paid_amount_cents,w.extra_guests,w.chef_cost_cents,w.chef_reimbursed_cents,w.chef_cost_recorded_at,NULL,1,w.source FROM walk_in_guests w JOIN events e ON e.id=w.event_id WHERE w.event_id=? AND e.ends_at+604800000>?`;
   const bindings = [now, selected?.id ?? '', now, selected?.id ?? '', now];
   const people = await db
     .prepare(
@@ -82,6 +88,7 @@ export const load = async (event: import('./$types').PageServerLoadEvent) => {
       created_at: number;
       dietary_notes: string | null;
       walk_in: number;
+      source: string;
       paid_at: number | null;
       paid_amount_cents: number;
       extra_guests: number;
@@ -105,17 +112,22 @@ export const load = async (event: import('./$types').PageServerLoadEvent) => {
     )
     .bind(...bindings)
     .first<{ received: number; costs: number; reimbursed: number; missing: number }>();
+  const dietary = await getGatheringDietary(db, selected?.id ?? '', now);
   const mapped = rows.results.map((r) => ({
     ...r,
-    // Planning budgets include every confirmed person, including volunteers.
-    budget: { starter: r.confirmed * 2, main: r.confirmed * 3, dessert: r.confirmed * 2 },
+    // Unannounced parties arrive after groceries are budgeted; deduct three chef places.
+    budget: { starter: Math.max(0, r.confirmed - r.unannounced - 3) * 2, main: Math.max(0, r.confirmed - r.unannounced - 3) * 3, dessert: Math.max(0, r.confirmed - r.unannounced - 3) * 2 },
     starts: localInput(r.starts_at),
+    attendanceOpensAt: mondayStartsAt(r.starts_at),
     ends: localInput(r.ends_at),
   }));
   return {
     rows: mapped,
     selected: mapped.find((r) => r.id === selected?.id),
-    people: people.results,
+    people: people.results.map(({ dietary_notes, ...person }) => person),
+    dietaryNotes: dietary.notes,
+    dietaryAllergens: dietary.allergens,
+    manualDietary: { notes: dietary.manualNotes, version: dietary.version },
     finance: {
       received: finance!.received,
       costs: finance!.costs,
@@ -139,6 +151,15 @@ const transition = z.object({
   ack: z.literal('on'),
 });
 export const actions = {
+  dietary: async (event) => {
+    const { db, admin } = requireAdmin(event);
+    try {
+      await saveGatheringDietary(db, admin.id, await event.request.formData());
+      return { saved: true };
+    } catch (error) {
+      return adminFail(event.locals.locale, 409, error instanceof AdminError ? error.message : 'Could not save.');
+    }
+  },
   chefCost: async (event) => {
     const { db, admin } = requireAdmin(event);
     const parsed = chefCostInput.safeParse(Object.fromEntries(await event.request.formData()));
@@ -208,7 +229,7 @@ export const actions = {
     const { db, admin } = requireAdmin(event);
     const parsed = walkInInput.safeParse(Object.fromEntries(await event.request.formData()));
     if (!parsed.success)
-      return adminFail(event.locals.locale, 400, 'Check the name and override confirmation.');
+      return adminFail(event.locals.locale, 400, 'Check the name, additional guests and source.');
     try {
       await addWalkIn(db, admin.id, parsed.data);
       return { saved: true };
@@ -262,7 +283,7 @@ export const actions = {
   },
   create: async (event) => {
     const { db, admin } = requireAdmin(event);
-    const parsed = uniqueGathering.safeParse(Object.fromEntries(await event.request.formData()));
+    const parsed = uniqueGathering.safeParse(readEventForm(await event.request.formData()));
     if (!parsed.success) return adminFail(event.locals.locale, 400, 'Check the gathering fields.');
     let id: string;
     try {
@@ -278,7 +299,7 @@ export const actions = {
   },
   save: async (event) => {
     const { db, admin } = requireAdmin(event);
-    const p = eventEdit.safeParse(Object.fromEntries(await event.request.formData()));
+    const p = eventEdit.safeParse(readEventForm(await event.request.formData()));
     if (!p.success) return adminFail(event.locals.locale, 400, 'Check the gathering fields.');
     try {
       await saveEvent(db, admin.id, p.data);

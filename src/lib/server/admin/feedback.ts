@@ -8,8 +8,7 @@ const dutch: Record<string, string> = {
     'Controleer het recept. Gebruik kleine letters en streepjes in de URL-naam.',
   'Image storage is unavailable.': 'Afbeeldingsopslag is niet beschikbaar.',
   'Use a different position number for each photo.': 'Geef elke foto een ander positienummer.',
-  'Could not save. The record changed, a limit was exceeded, or the database rejected the update. Reload and check the details.':
-    'Opslaan is niet gelukt. De gegevens zijn gewijzigd of een limiet is bereikt. Herlaad de pagina en controleer de gegevens.',
+  'Could not save, try again': 'Opslaan is niet gelukt, probeer opnieuw',
   'Registration no longer exists': 'Deze aanmelding bestaat niet meer.',
   'Gathering no longer exists': 'Deze bijeenkomst bestaat niet meer.',
   'Gathering must be in the future and end after it starts':

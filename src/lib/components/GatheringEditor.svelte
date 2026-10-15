@@ -1,4 +1,5 @@
 <script lang="ts">
+  import GatheringDateTime from './GatheringDateTime.svelte';
   let {
     row,
     nl,
@@ -26,21 +27,8 @@
       name="version"
       value={row.version}
     />
-    <label
-      >{nl ? 'Start diner' : 'Dinner starts'}<input
-        type="datetime-local"
-        name="starts"
-        value={row.starts}
-        required
-      /></label
-    ><label
-      >{nl ? 'Einde diner' : 'Dinner ends'}<input
-        type="datetime-local"
-        name="ends"
-        value={row.ends}
-        required
-      /></label
-    >
+    <GatheringDateTime name="starts" label={nl ? 'Start diner' : 'Dinner starts'} {nl} value={row.starts} />
+    <GatheringDateTime name="ends" label={nl ? 'Einde diner' : 'Dinner ends'} {nl} value={row.ends} defaultTime="22:00" />
     <label
       >{nl ? 'Locatie' : 'Venue'}<input
         name="venue"

@@ -12,6 +12,14 @@ const id = () => text('id').primaryKey();
 const created = () => integer('created_at').notNull(); // UTC epoch milliseconds everywhere.
 
 // Gatherings and defaults
+export const gatheringDietary = sqliteTable('gathering_dietary', {
+  eventId: text('event_id')
+    .primaryKey()
+    .references(() => events.id, { onDelete: 'cascade' }),
+  notes: text('notes'),
+  version: integer('version').notNull().default(0),
+  updatedAt: integer('updated_at').notNull(),
+});
 export const venues = sqliteTable('venues', {
   id: id(),
   name: text('name').notNull(),
@@ -463,6 +471,13 @@ export const walkInGuests = sqliteTable(
     extraGuests: integer('extra_guests').notNull().default(0),
     limitsOverridden: integer('limits_overridden', { mode: 'boolean' }).notNull().default(false),
     overrideReason: text('override_reason'),
+    source: text('source').notNull().default('other'),
+    role: text('role', { enum: ['guest', 'helper_chef', 'chef'] })
+      .notNull()
+      .default('guest'),
+    chefCostCents: integer('chef_cost_cents').notNull().default(0),
+    chefReimbursedCents: integer('chef_reimbursed_cents').notNull().default(0),
+    chefCostRecordedAt: integer('chef_cost_recorded_at'),
     version: integer('version').notNull().default(0),
     createdAt: created(),
     updatedAt: integer('updated_at').notNull(),

@@ -1,13 +1,77 @@
 <script lang="ts">
+  import GatheringDateTime from '$lib/components/GatheringDateTime.svelte';
   import { goto } from '$app/navigation';
   import { navigating } from '$app/state';
   import { getLocaleStore } from '$lib/locale-context';
   import AdminPersonControls from '$lib/components/AdminPersonControls.svelte';
   import GatheringEditor from '$lib/components/GatheringEditor.svelte';
+  import { allergens } from '$lib/dietary';
+  import DietaryFields from '$lib/components/DietaryFields.svelte';
+  import { enhance } from '$app/forms';
+  import { tick } from 'svelte';
+  import type { SubmitFunction } from '@sveltejs/kit';
   let { data, form } = $props();
   const locale = getLocaleStore();
   let creatingGathering = $state(false);
+  let editingGathering = $state(false);
+  let financeOpen = $state(false);
+  const financeEventId = $derived(data.selected?.id);
+  const financeStartsAt = $derived(data.selected?.starts_at);
+  function rememberFinance(open: boolean) {
+    financeOpen = open;
+    try { sessionStorage.setItem(`tgv-finance:${financeEventId}`, String(open)); } catch { /* Storage is optional. */ }
+  }
+  $effect(() => {
+    const startsAt = financeStartsAt;
+    const eventId = financeEventId;
+    if (!startsAt) { financeOpen = false; return; }
+    const opensAt = startsAt - 60 * 60 * 1000;
+    let automaticallyOpened = Date.now() >= opensAt;
+    let remembered: string | null = null;
+    try { remembered = sessionStorage.getItem(`tgv-finance:${eventId}`); } catch { /* Storage is optional. */ }
+    financeOpen = remembered === null ? automaticallyOpened : remembered === 'true';
+    const timer = setInterval(() => {
+      if (!automaticallyOpened && Date.now() >= opensAt) {
+        automaticallyOpened = true;
+        rememberFinance(true);
+      }
+    }, 1000);
+    return () => clearInterval(timer);
+  });
+  let savedToast = $state(false);
+  $effect(() => {
+    if (!form?.saved) { savedToast = false; return; }
+    savedToast = true;
+    const timer = setTimeout(() => { savedToast = false; }, 3000);
+    return () => clearTimeout(timer);
+  });
+  $effect(() => {
+    data.selected?.id;
+    editingGathering = false;
+  });
   let editingPerson = $state<string | null>(null);
+  let addPersonOpen = $state(false);
+  let editingDietary = $state(false);
+  let addingPerson = $state(false);
+  let addSubmission = $state<string | null>(null);
+  const addPerson: SubmitFunction = ({ formElement, cancel }) => {
+    if (addingPerson) { cancel(); return; }
+    addingPerson = true;
+    return async ({ result, update }) => {
+      try {
+        await update({ reset: false });
+        if (result.type === 'success') {
+          const name = formElement.elements.namedItem('fullName') as HTMLInputElement;
+          const guests = formElement.elements.namedItem('extraGuests') as HTMLInputElement;
+          name.value = '';
+          guests.value = '0';
+          addSubmission = crypto.randomUUID();
+          await tick();
+          name.focus();
+        }
+      } finally { addingPerson = false; }
+    };
+  };
   let nl = $derived($locale === 'nl');
   let costDrafts = $state<Record<string, { event: string; cents: number; saving: boolean }>>({});
   function previewCost(id: string, cents: number | null, saving: boolean) {
@@ -19,6 +83,7 @@
     }
   }
   let activeDrafts = $derived(data.people.filter(person => costDrafts[person.id]?.event === data.selected?.id));
+  let savingCost = $derived(activeDrafts.some(person => costDrafts[person.id].saving));
   let costDelta = $derived(activeDrafts.reduce((sum, person) => sum + costDrafts[person.id].cents - person.chef_cost_cents, 0));
   let finance = $derived({ ...data.finance,
     costs: data.finance.costs + costDelta,
@@ -31,6 +96,12 @@
       dateStyle: 'full',
     }),
   );
+  let gatheringDate = $derived(new Intl.DateTimeFormat(nl ? 'nl-NL' : 'en-GB', {
+    timeZone: 'Europe/Amsterdam', weekday: 'long', day: 'numeric', month: 'short',
+  }));
+  function shortAddress(address: string) {
+    return address.replace(/\b\d{4}\s?[A-Z]{2}\b\s*/gi, '').replace(/,\s*,/g, ',').trim();
+  }
   let money = $derived(
     new Intl.NumberFormat(nl ? 'nl-NL' : 'en-GB', { style: 'currency', currency: 'EUR' }),
   );
@@ -51,12 +122,15 @@
 <h2 class="admin-gathering-title">
   {nl ? 'Bijeenkomsten & deelnemers' : 'Gatherings & participants'}
 </h2>
-{#if form?.saved}<p class="form-success" role="status">{nl ? 'Opgeslagen.' : 'Saved.'}</p>{/if}
+<div class="admin-save-announcement" role="status" aria-live="polite" aria-atomic="true">
+  {#if savingCost}<p class="admin-save-toast admin-save-toast-pending">{nl ? 'Opslaan…' : 'Saving…'}</p>
+  {:else if savedToast}{#key form}<p class="admin-save-toast">{nl ? 'Opgeslagen.' : 'Saved.'}</p>{/key}{/if}
+</div>
 {#if form?.message}<p class="form-error" role="alert">{form.message}</p>{/if}
 <div class="admin-gathering-toolbar">
   <form method="GET" action="/admin/events" class="admin-filters">
     <label
-      >{nl ? 'Bijeenkomst' : 'Gathering'}<select
+      ><span>{nl ? 'Bijeenkomst' : 'Gathering'}</span><select
         name="event"
         value={data.selected?.id}
         onchange={(event) =>
@@ -77,12 +151,11 @@
     type="button"
     class="button admin-add-gathering"
     aria-label={nl ? 'Unieke bijeenkomst toevoegen' : 'Add a unique gathering'}
+    title={nl ? 'Unieke bijeenkomst toevoegen' : 'Add a unique gathering'}
     aria-expanded={creatingGathering}
     aria-controls="create-gathering"
     onclick={() => (creatingGathering = !creatingGathering)}
-    ><span aria-hidden="true">＋</span><span class="admin-add-gathering-label"
-      >{nl ? 'Unieke bijeenkomst toevoegen' : 'Add a unique gathering'}</span
-    ></button
+    ><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v9M16 1v4M8 1v4M3 9h18M19 16v6M16 19h6"/></svg></button
   >
 </div>
 <p class="sr-only" role="status">
@@ -96,20 +169,8 @@
 >
   <form method="POST" action="?/create" class="form-grid admin-editor">
     <input type="hidden" name="id" value={data.gatheringSubmission} />
-    <label
-      >{nl ? 'Start diner' : 'Dinner starts'}<input
-        type="datetime-local"
-        name="starts"
-        required
-      /></label
-    >
-    <label
-      >{nl ? 'Einde diner' : 'Dinner ends'}<input
-        type="datetime-local"
-        name="ends"
-        required
-      /></label
-    >
+    <GatheringDateTime name="starts" label={nl ? 'Start diner' : 'Dinner starts'} {nl} />
+    <GatheringDateTime name="ends" label={nl ? 'Einde diner' : 'Dinner ends'} {nl} defaultTime="22:00" />
     <label
       >{nl ? 'Locatie' : 'Venue'}<input
         name="venue"
@@ -152,17 +213,22 @@
   {@const gathering = data.selected}
   <div class="admin-gathering-workspace" aria-busy={!!navigating.to}>
     <section class="card admin-gathering-card" aria-labelledby="selected-gathering">
-      <h3 id="selected-gathering">{date.format(gathering.starts_at)}</h3>
-      <p>{gathering.venue} · {gathering.address}</p>
+      <div class="admin-gathering-heading">
+        <div class="admin-gathering-heading-text">
+        <h3 id="selected-gathering">{gatheringDate.format(gathering.starts_at)}</h3>
+        <p class="admin-gathering-venue">{gathering.venue} · {shortAddress(gathering.address)}</p>
+        </div>
+        <button type="button" class="admin-edit-gathering" aria-label={nl ? 'Bijeenkomst bewerken' : 'Edit gathering'} title={nl ? 'Bijeenkomst bewerken' : 'Edit gathering'} aria-expanded={editingGathering} aria-controls="edit-gathering" onclick={() => editingGathering = !editingGathering}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m16 3 5 5-12 12-6 1 1-6Z M14 5l5 5"/></svg>
+        </button>
+      </div>
       {#if gathering.description}<p>{gathering.description}</p>{/if}
       <ul
         class="gathering-count-chips"
         aria-label={nl ? 'Deelnemers en gangbudgetten' : 'Participants and course budgets'}
       >
-        <li class="gathering-count-chip count-primary">
-          <strong>{gathering.confirmed}<span> / {gathering.capacity}</span></strong><span
-            >{nl ? 'plaatsen bezet' : 'seats filled'}</span
-          >
+        <li class="gathering-count-chip count-primary" aria-label={nl ? `${gathering.confirmed} van ${gathering.capacity} plaatsen bezet` : `${gathering.confirmed} of ${gathering.capacity} seats filled`}>
+          <strong aria-hidden="true">{gathering.confirmed}<span> / {gathering.capacity}</span></strong>
         </li>
         <li
           class="gathering-count-chip course-budget-chip"
@@ -172,14 +238,40 @@
           title={nl ? 'Voorgerecht / hoofdgerecht / nagerecht' : 'Starter / main / dessert'}
         >
           <span aria-hidden="true"
-            >Budget <strong
+            ><strong
               >€{gathering.budget.starter} / €{gathering.budget.main} / €{gathering.budget
                 .dessert}</strong
             ></span
           >
         </li>
+        {#each allergens.filter(item => data.dietaryAllergens.includes(item.id)) as item}<li class="gathering-dietary-control"><button type="button" class="gathering-count-chip admin-allergy-badge dietary-edit-chip" aria-expanded={editingDietary} aria-controls="gathering-dietary-editor" onclick={() => editingDietary = !editingDietary}><span class="allergen-icon" style={`--allergen-icon: url('${item.icon}')`} aria-hidden="true"></span><span class="gathering-chip-text">{item.id === 'gluten' ? 'Gluten' : nl ? item.nl : item.en}</span></button></li>{/each}
+        {#if data.dietaryNotes.length}<li class="gathering-dietary-control"><button type="button" class="gathering-count-chip admin-allergy-badge dietary-edit-chip" aria-expanded={editingDietary} aria-controls="gathering-dietary-editor" onclick={() => editingDietary = !editingDietary}>{nl ? 'Overige dieetdetails' : 'Other dietary details'}</button></li>{/if}
+        {#if !data.dietaryAllergens.length && !data.dietaryNotes.length}<li class="gathering-dietary-control"><button
+          type="button" class="gathering-count-chip dietary-edit-chip"
+          title={nl ? 'Geen allergenen gemeld' : 'No allergens reported'}
+          class:admin-allergy-badge={!!data.dietaryAllergens.length || !!data.dietaryNotes.length}
+          aria-expanded={editingDietary} aria-controls="gathering-dietary-editor"
+          onclick={() => editingDietary = !editingDietary}>
+          <svg class="dietary-none-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 16c-1-6 2-9 8-9 0 6-3 9-8 9ZM8 16l7-8M5.6 5.6l12.8 12.8"/></svg>
+          <span class="dietary-chip-short" aria-hidden="true">{nl ? 'Geen melding' : 'No report'}</span><span class="dietary-chip-full">{nl ? 'Geen allergenen gemeld' : 'No allergens reported'}</span>
+        </button></li>{/if}
       </ul>
+      {#if editingDietary}<form id="gathering-dietary-editor" class="form-grid" method="POST" action={`?event=${encodeURIComponent(gathering.id)}&/dietary`} use:enhance>
+        <input type="hidden" name="eventId" value={gathering.id} /><input type="hidden" name="version" value={data.manualDietary.version} />
+        <DietaryFields {nl} notes={data.manualDietary.notes} expanded includeExtra compact onCollapse={() => editingDietary = false} />
+        <label class="consent full"><input type="checkbox" name="dietaryConsent" required checked={!!data.manualDietary.notes} /><span>{nl ? 'De betrokkenen hebben ingestemd dat deze informatie wordt gebruikt om dit diner te organiseren.' : 'The people concerned agreed to this information being used to organize this dinner.'}</span></label>
+        <button class="button">{nl ? 'Opslaan' : 'Save'}</button>
+      </form>{/if}
+      {#if data.dietaryNotes.length}<details id="gathering-dietary">
+        <summary>{nl ? 'Dieet- en allergie-informatie' : 'Dietary and allergy information'}</summary>
+        <ul>{#each data.dietaryNotes as note}<li>{note}</li>{/each}</ul>
+      </details>{/if}
+      <button type="button" class="admin-finance-toggle" aria-label={nl ? 'Financieel overzicht' : 'Financial summary'} aria-expanded={financeOpen} aria-controls="gathering-finance" onclick={() => rememberFinance(!financeOpen)}>
+        <span></span><svg width="32" height="16" viewBox="0 0 32 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={financeOpen ? 'M3 13 16 3 29 13' : 'M3 3 16 13 29 3'}/></svg><span></span>
+      </button>
       <section
+        id="gathering-finance"
+        hidden={!financeOpen}
         class="admin-balance-panel"
         aria-label={nl ? 'Werkelijke inkomsten en kosten' : 'Actual income and costs'}
       >
@@ -209,9 +301,7 @@
             <dd>{money.format(finance.balance / 100)}</dd>
           </div>
         </dl>
-        {#if activeDrafts.length}<p class="small" role="status">{activeDrafts.some(person => costDrafts[person.id].saving)
-          ? nl ? 'Opslaan…' : 'Saving…'
-          : nl ? 'Voorbeeld — verlaat het kostenveld om op te slaan.' : 'Preview — leave the cost field to save.'}</p>{/if}
+        {#if activeDrafts.length && !savingCost}<p class="small" role="status">{nl ? 'Voorbeeld — verlaat het kostenveld om op te slaan.' : 'Preview — leave the cost field to save.'}</p>{/if}
 
         {#if data.finance.missing}<p class="small form-notice">
             {nl
@@ -222,68 +312,56 @@
       {#if gathering.status === 'cancelled'}<p class="form-error">
           {labels.cancelled[nl ? 0 : 1]}
         </p>{/if}
-      <details>
-        <summary>{nl ? 'Bijeenkomst bewerken' : 'Edit gathering'}</summary>
+      <div id="edit-gathering" hidden={!editingGathering}>
         <div class="admin-editor"><GatheringEditor row={gathering} {nl} /></div>
-      </details>
+      </div>
     </section>
-    <section class="admin-participants-panel" aria-labelledby="gathering-participants">
-      <h3 id="gathering-participants">
-        {nl ? 'Deelnemers' : 'Participants'} ({data.selected.confirmed})
+    <div class="admin-participants-column">
+      {#each [
+        {status:'main', people:data.people.filter(person => person.status === 'confirmed')},
+        {status:'other', people:data.people.filter(person => person.status !== 'confirmed').sort((a,b) => ['waiting_list','undecided','no_show','cancelled'].indexOf(a.status)-['waiting_list','undecided','no_show','cancelled'].indexOf(b.status))}
+      ].filter(group => group.status === 'main' || group.people.length) as group (group.status)}
+    <section class="card admin-participants-panel" class:admin-other-registrations={group.status === 'other'} aria-labelledby={group.status === 'main' ? 'gathering-participants' : 'other-registrations'}>
+      <h3 id={group.status === 'main' ? 'gathering-participants' : 'other-registrations'}>
+        {group.status === 'main' ? (nl ? 'Deelnemers' : 'Participants') : (nl ? 'Overige aanmeldingen' : 'Other registrations')}
+        ({group.status === 'main' ? data.selected.confirmed : Object.entries(data.counts).reduce((sum,[status,count]) => sum + (status === 'confirmed' ? 0 : count),0)})
       </h3>
 
-      {#if gathering.status === 'scheduled' && gathering.ends_at > data.now}
-        <details class="card admin-new-gathering">
-          <summary>＋ {nl ? 'Persoon toevoegen' : 'Add person'}</summary>
+      {#if group.status === 'main' && gathering.status === 'scheduled' && gathering.ends_at > data.now}
+        <details class="admin-new-gathering" bind:open={addPersonOpen}
+          ontoggle={(event) => { if (event.currentTarget.open) editingPerson = null; }}>
+          <summary title={nl ? 'Persoon toevoegen' : 'Add person'}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="7" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3M19 8v6M16 11h6"/></svg>
+            <span class="sr-only">{nl ? 'Persoon toevoegen' : 'Add person'}</span>
+          </summary>
           <form
             method="POST"
             action={`?event=${encodeURIComponent(gathering.id)}&/addPerson`}
             class="form-grid admin-editor"
+            use:enhance={addPerson}
+            aria-busy={addingPerson}
           >
-            <input type="hidden" name="id" value={data.submission} /><input
+            <input type="hidden" name="id" value={addSubmission ?? data.submission} /><input
               type="hidden"
               name="eventId"
               value={gathering.id}
             />
-            <label class="full"
-              >{nl ? 'Naam' : 'Name'}<input name="fullName" maxlength="160" required /></label
-            >
-            <label class="full"
-              >{nl ? 'Extra gasten' : 'Additional guests'}<input
-                type="number"
-                name="extraGuests"
-                min="0"
-                max="99"
-                value="0"
-                required
-              /></label
-            >
-            <p class="small full">
-              {nl
-                ? 'Voor mensen die via WhatsApp of persoonlijk meedoen. Een naam is genoeg; deze persoon wordt als gast toegevoegd, zonder e-mail of privélink. Telt mee voor plaatsen en maaltijden. De wachtlijst houdt voorrang.'
-                : 'For people joining through WhatsApp or in person. A name is enough; they are added as a guest, without email or a private link. Counts toward seats and meals. Waiting-list priority is preserved.'}
-            </p>
-            <label class="consent full"
-              ><input type="checkbox" name="override" /><span
-                >{nl
-                  ? 'Extra plaats/maaltijd beschikbaar: verhoog zo nodig de limieten van deze bijeenkomst.'
-                  : 'Extra seat/meal is available: raise this gathering’s limits if needed.'}</span
-              ></label
-            >
-            <label class="full"
-              >{nl ? 'Reden (verplicht bij overschrijven)' : 'Reason (required for override)'}<input
-                name="reason"
-                maxlength="500"
-              /></label
-            >
-            <button class="button">{nl ? 'Persoon toevoegen' : 'Add person'}</button>
+            <div class="full admin-role-guests admin-add-name-guests">
+              <label>{nl ? 'Naam' : 'Name'}<input name="fullName" maxlength="160" required /></label>
+              <label>{nl ? 'Extra gasten' : 'Extra guests'}<input type="number" name="extraGuests" min="0" max="99" value="0" required /></label>
+            </div>
+            <div class="full admin-role-guests">
+              <label>{nl ? 'Rol' : 'Role'}<select name="role">{#each Object.entries(roles) as [value,label]}<option {value}>{label[nl ? 0 : 1]}</option>{/each}</select></label>
+              <label>{nl ? 'Via' : 'Source'}<select name="source"><option value="whatsapp">WhatsApp</option><option value="unannounced">{nl ? 'Onaangekondigd' : 'Unannounced'}</option></select></label>
+            </div>
+            <button class="button" disabled={addingPerson}>{addingPerson ? (nl ? 'Toevoegen…' : 'Adding…') : (nl ? 'Persoon toevoegen' : 'Add person')}</button>
           </form>
         </details>
       {/if}
       <ul class="admin-list admin-people">
-        {#each data.people as person, index (person.id)}<li
+        {#each group.people as person, index (person.id)}<li
             class="card"
-            class:admin-last-chef={person.role === 'chef' && data.people[index + 1]?.role !== 'chef'}
+            class:admin-last-chef={group.status === 'main' && person.role === 'chef' && group.people[index + 1]?.role !== 'chef'}
           >
             <div class="admin-person-header">
               <button
@@ -291,15 +369,18 @@
                 class="admin-person-toggle"
                 aria-expanded={editingPerson === person.id}
                 aria-controls={`person-editor-${person.id}`}
-                onclick={() => (editingPerson = editingPerson === person.id ? null : person.id)}
+                onclick={() => {
+                  addPersonOpen = false;
+                  editingPerson = editingPerson === person.id ? null : person.id;
+                }}
               >
                 <span aria-hidden="true">{editingPerson === person.id ? '−' : '+'}</span><strong
                   >{person.full_name}{person.extra_guests
                     ? ` + ${person.extra_guests}`
                     : ''}</strong
-                >{#if person.dietary_notes}<span class="admin-allergy-badge">{nl ? 'Allergie' : 'Allergy'}</span>{/if}<span class="admin-person-role"
+                ><span class="admin-person-role"
                   >{roles[person.role]?.[nl ? 0 : 1]}{person.walk_in
-                    ? ' · ' + (nl ? 'Handmatig toegevoegd' : 'Added by organizer')
+                    ? (person.source === 'whatsapp' ? '' : ' · ' + (person.source === 'unannounced' ? (nl ? 'Onaangekondigd' : 'Unannounced') : (nl ? 'Handmatig toegevoegd' : 'Added by organizer')))
                     : ''}</span
                 >
               </button>
@@ -308,7 +389,8 @@
                 onCostPreview={previewCost}
                 eventId={gathering.id}
                 {nl}
-                startsAt={gathering.starts_at}
+                attendanceOpensAt={gathering.attendanceOpensAt}
+                full={gathering.confirmed >= gathering.capacity}
                 now={data.now}
                 cancelled={gathering.status === 'cancelled'}
               />
@@ -341,13 +423,13 @@
                         value={person.email_normalized ?? ''}
                       />{/if}
                     <div class="full admin-role-guests">
-                      {#if !person.walk_in}<label
+                      <label
                         >{nl ? 'Rol' : 'Role'}<select name="role" value={person.role}
                           >{#each Object.entries(roles) as [value, label]}<option {value}
                               >{label[nl ? 0 : 1]}</option
                             >{/each}</select
                         ></label
-                      >{/if}
+                      >
                     <label
                       >{nl ? 'Extra gasten' : 'Additional guests'}<input
                         type="number"
@@ -366,9 +448,6 @@
                         maxlength="2000">{person.comments ?? ''}</textarea
                       ></label
                     >
-                    {#if person.dietary_notes}<p class="small full">
-                        {nl ? 'Dieet/allergieën' : 'Diet/allergies'}: {person.dietary_notes}
-                      </p>{/if}
                     {#if person.walk_in}<p class="small full">
                         {nl
                           ? 'Zet geen dieet- of allergiegegevens in deze notities.'
@@ -382,9 +461,11 @@
                   {#if person.comments}<p>{person.comments}</p>{/if}{/if}
               </div>{/if}
           </li>{:else}<li class="card">
-            {nl ? 'Nog geen deelnemers.' : 'No participants yet.'}
+            {nl ? 'Nog geen bevestigde deelnemers.' : 'No confirmed participants yet.'}
           </li>{/each}
       </ul>
+    </section>
+      {/each}
       <nav class="admin-pagination" aria-label={nl ? 'Deelnemerspagina’s' : 'Participant pages'}>
         {#if data.page > 1}<a href="?event={encodeURIComponent(gathering.id)}&page={data.page - 1}"
             >← {nl ? 'Vorige' : 'Previous'}</a
@@ -394,7 +475,7 @@
             >{nl ? 'Volgende' : 'Next'} →</a
           >{/if}
       </nav>
-    </section>
+    </div>
   </div>
 {:else}<p>
     {nl ? 'Voeg een bijeenkomst toe om te beginnen.' : 'Add a gathering to get started.'}

@@ -43,3 +43,12 @@ SMTP transport/renderer, retry worker, production cron, public abuse protections
 No deployment. No private coordination invitation has been invented or committed.
 
 Verification: thirty-one tests and Svelte/TypeScript checks pass; local migrations apply; the Cloudflare adapter build passes in a clean local copy. Browser testing covered a synthetic undecided signup, confirmation, comment update and cancellation. Synthetic rows and queued emails were removed afterward. Git ignores both local signing settings and local D1 data.
+
+## Structured dietary input (15 October 2026)
+Signup and private management use multiple allergen checkboxes covering the participant and accompanying guests. Nine plant-based allergen categories appear first; milk, eggs, fish, crustaceans and molluscs remain available under Other allergens for cross-contact. Optional ingredient-only Other (160 characters) and preparation details (300 characters) supplement selections. Existing free text is preserved for review; categories are never guessed from legacy text. Explicit consent is required for any submitted dietary information.
+
+A versioned structured value is stored in the existing dietary_notes column, so consent, late-change notifications and +24-hour purge remain unchanged. Invalid/unknown categories and oversized fields are rejected server-side. Empty forms store no dietary data. No migration or deployment is required.
+
+Dietary section is now collapsible, initially closed for new bookings and open for existing dietary data or validation errors. Other ingredients and preparation details share one 460-character field inside Other allergens; existing separate values are combined without loss. Legacy notes remain editable there. Consent stays outside the collapsible section.
+
+Remaining undecided bookings automatically cancel at Saturday 16:00. The local operations runner performs the sweep, with catch-up in admin views and valid undecided management-page loads. Cancellation and notification intent commit atomically; repeated sweeps do not duplicate messages. Confirmation remains rejected at/after cutoff independently of sweeps. No production scheduler or actual email sending is introduced.
