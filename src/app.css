@@ -108,8 +108,20 @@
   .date-card time { display: block; font-family: var(--font-display); }
   .day { display: block; font-size: 2.6rem; font-weight: 600; line-height: 1.1; }
   .month { display: block; font-size: 1.05rem; margin-top: 6px; }
+  .agenda-month-compact { display: none; }
   .date-card > .small { margin-top: 22px; color: var(--color-inksoft); }
   .date-status { font-size: .87rem; font-weight: 700; margin-top: 10px; }
+  .date-status[data-availability=available] { color: var(--color-forest); }
+  .date-status[data-availability=almost_full] { color: #896500; }
+  .date-status[data-availability=waiting_list] { color: var(--color-rasp); }
+  .date-status[data-availability=available], .date-status[data-availability=almost_full], .date-status[data-availability=waiting_list] { display: inline-block; padding: 4px 10px; border-radius: 999px; }
+  .date-status[data-availability=available] { background: #e0f2e4; }
+  .date-status[data-availability=almost_full] { background: #fff0b3; }
+  .date-status[data-availability=waiting_list] { background: #fbe2e9; }
+  .date-card { position: relative; }
+  .agenda-select { position: absolute; inset: 0; z-index: 1; border-radius: inherit; }
+  .date-card:has(.agenda-select):hover { border-color: var(--color-forest); }
+  .date-card .date-status .opening-date { display: inline; font: inherit; }
   .date-future { background: transparent; border-style: dashed; border-color: #a7a797; }
   .date-future time { color: #686d61; }
   .future-label { display: inline-block; margin-top: 16px; color: var(--color-inksoft); font-size: .75rem; border-top: 1px solid var(--color-line); padding-top: 10px; }
@@ -195,6 +207,10 @@
   .page-width { padding-inline: 20px; }
   .section-space { padding-block: 60px; }
   .hero-grid, .join-grid, .recipe-grid { grid-template-columns: 1fr; gap: 36px; }
+  .join-information { display: contents; }
+  .join-introduction { order: 0; }
+  .join-grid > .registration-preview { order: 1; }
+  .join-contact { order: 2; }
   .hero h1 { font-size: clamp(2.4rem, 8vw, 3.5rem); }
   .hero-details { max-width: 560px; }
   .hero-intro { max-width: 52ch; }
@@ -204,6 +220,12 @@
   .photo-grid .gallery-lead { height: 300px; }
   .gallery-section { padding-bottom: 60px; }
   .agenda-grid { grid-template-columns: 1fr 1fr; }
+  .agenda-grid .date-card { padding: 16px; min-width: 0; }
+  .agenda-month-full { display: none; }
+  .agenda-month-compact { display: inline; white-space: nowrap; }
+  .agenda-grid .date-status { font-size: .75rem; padding-inline: 8px; }
+  .agenda-grid .date-status[data-availability=available], .agenda-grid .date-status[data-availability=almost_full], .agenda-grid .date-status[data-availability=waiting_list] { white-space: nowrap; }
+  .agenda-grid .date-card > .small { font-size: .75rem; }
   .role-grid { grid-template-columns: 1fr; gap: 24px; }
   .recipe-grid picture { height: 280px; }
   .footer-grid { grid-template-columns: 1fr 1fr; gap: 40px 24px; }
@@ -302,6 +324,7 @@
 .admin-save-toast { margin: 0; padding: 12px 24px; border: 1px solid #b7d7bd; border-radius: 8px; background: #e5f2e6; color: #145e24; box-shadow: 0 4px 20px #0002; animation: admin-toast-fade 3s both; }
 @keyframes admin-toast-fade { 0% { opacity: 0; } 8%, 85% { opacity: 1; } 100% { opacity: 0; } }
 .admin-save-toast-pending { animation: none; background: #e1effb; color: #204d75; border-color: #b5d2ec; }
+@media (max-width: 380px) { .agenda-grid .date-card { padding: 12px; } .agenda-grid .date-status { font-size: .7rem; padding-inline: 6px; } }
 @media (prefers-reduced-motion: reduce) { .admin-save-toast { animation: none; } }
 .admin-people summary strong { min-width: 0; }
 

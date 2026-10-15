@@ -1,7 +1,7 @@
 export const registrationCopy = {
   en: {
     submit: 'Register for dinner',
-    unsure: 'I’m not sure yet (A reminder will be sent)',
+    unsure: 'Interested but not sure yet? Tick this for an email reminder about this dinner. No place reserved.',
     localNotice: 'Local test registration. Email delivery is not configured yet; save the private management link shown after registration.',
     unavailable: 'Registration is not open yet. Please contact the organizers if you have questions.',
     errors: {
@@ -57,7 +57,7 @@ export const registrationCopy = {
   },
   nl: {
     submit: 'Aanmelden voor het eten',
-    unsure: 'Ik weet het nog niet zeker (Er wordt een herinnering gestuurd)',
+    unsure: 'Interesse, maar nog niet zeker? Vink dit aan voor een e-mailherinnering over dit diner. Geen plek gereserveerd.',
     localNotice: 'Lokale testaanmelding. E-mailbezorging is nog niet ingesteld; bewaar de privélink die je na aanmelding krijgt.',
     unavailable: 'Aanmelden kan nog niet. Neem voor vragen contact op met de organisatoren.',
     errors: {

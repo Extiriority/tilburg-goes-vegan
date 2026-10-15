@@ -1,5 +1,23 @@
 # Changelog
 
+- Tightened mobile agenda cards with abbreviated months and single-line availability chips to keep adjacent cards aligned.
+
+- Explicitly welcomed beginners in the English and Dutch helper-chef descriptions.
+
+- Added chatting alongside games in the bilingual guest description.
+
+- Clarified guest arrival times: games from 18:00 and dinner at 19:00, in both languages.
+
+- Added the 19:00 dinner start to the bilingual guest-role description.
+
+- Simplified bilingual role descriptions by removing repeated prices, naming the chef card Main Chef/Hoofdchef and welcoming guests for games and/or dinner.
+
+- Added colored agenda availability chips, defaulted signup to the first open gathering, and linked open agenda cards to the matching form selection.
+
+- Moved join-section contact/map below the form on mobile only, shortened gray gathering notices to their opening weekday/day, and colored availability green, mustard yellow and pink.
+
+- Restored the undecided checkbox at the bottom of the registration form with bilingual wording for a selected-dinner email reminder, without implying a mailing-list subscription.
+
 ## 2026-10-15
 
 - Simplified the organizer allergen editor with a shorter heading, removed introductory copy and tighter checkbox spacing while retaining touch targets.

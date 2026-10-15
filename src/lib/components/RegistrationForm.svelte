@@ -12,6 +12,7 @@
     gatherings,
     error,
     fields = [],
+    selectedEventId = $bindable(''),
   }: {
     ready: boolean;
     submissionToken: string;
@@ -24,6 +25,7 @@
     }[];
     error?: string;
     fields?: string[];
+    selectedEventId?: string;
   } = $props();
   const locale = getLocaleStore();
   let t = $derived(siteCopy[$locale]);
@@ -33,6 +35,7 @@
   let formElement = $state<HTMLFormElement>();
   let errorSummary = $state<HTMLParagraphElement>();
   let available = $derived(ready && gatherings.some((event) => event.canRegister));
+  let effectiveEventId = $derived(gatherings.find(event => event.id === selectedEventId && event.canRegister)?.id ?? gatherings.find(event => event.canRegister)?.id ?? '');
   let formatter = $derived(
     new Intl.DateTimeFormat($locale === 'nl' ? 'nl-NL' : 'en-GB', {
       timeZone: 'Europe/Amsterdam',
@@ -127,10 +130,12 @@
         <label
           >{t.date}<select
             name="eventId"
+            value={effectiveEventId}
+            onchange={(event) => selectedEventId = event.currentTarget.value}
             required
             aria-invalid={fields.includes('eventId')}
             aria-describedby={fields.includes('eventId') ? 'eventId-error' : undefined}
-            ><option value="" disabled selected>{t.date}</option
+            ><option value="" disabled>{t.date}</option
             >{#each gatherings as gathering}<option
                 value={gathering.id}
                 disabled={!gathering.canRegister}
@@ -160,9 +165,6 @@
               : 'Do not include yourself. Additional guests pay €7 each. Your group reserves together or joins the waiting list together.'}</span
           ></label
         >
-        <label class="consent full"
-          ><input type="checkbox" name="undecided" /><span>{r.unsure}</span></label
-        >
         <DietaryFields nl={$locale === 'nl'} invalid={fields.includes('dietaryNotes')} error={r.fields.dietaryNotes} />
         <label class="consent full"
           ><input
@@ -189,6 +191,9 @@
           ></textarea>{#if fields.includes('comments')}<span id="comments-error" class="field-error"
               >{r.fields.comments}</span
             >{/if}</label
+        >
+        <label class="consent full"
+          ><input type="checkbox" name="undecided" /><span>{r.unsure}</span></label
         >
       </div>
       <button class="button button-wide" type="submit"

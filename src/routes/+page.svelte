@@ -62,6 +62,9 @@
       year: 'numeric'
     })
   );
+  let compactMonthFormat = $derived(new Intl.DateTimeFormat(locale === 'nl' ? 'nl-NL' : 'en-GB', {
+    timeZone: 'Europe/Amsterdam', month: 'short', year: 'numeric',
+  }));
   function ordinalSuffix(day: number) {
     if (day % 100 >= 11 && day % 100 <= 13) return 'th';
     return ({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[day % 10] ?? 'th';
@@ -73,6 +76,10 @@
     })
   );
   let first = $derived(data.gatherings[0]);
+  let selectedEventId = $state('');
+  let openingFormat = $derived(new Intl.DateTimeFormat(locale === 'nl' ? 'nl-NL' : 'en-GB', {
+    timeZone: 'Europe/Amsterdam', weekday: 'long', day: 'numeric',
+  }));
   const gallery = ['linzensoep', 'ramen', 'gazpacho', 'falafelbowl', 'paksoi'] as const;
 </script>
 
@@ -273,19 +280,20 @@
       <ul class="agenda-grid">
         {#each data.gatherings as gathering, i}
           <li class="date-card" class:date-future={i >= 2 || gathering.availability === 'not_open'}>
+            {#if i < 2 && gathering.canRegister}
+              <a class="agenda-select" href="#join" aria-label={`${t.join}: ${accessibleDateFormat.format(gathering.startsAt)}`} onclick={() => selectedEventId = gathering.id}></a>
+            {/if}
             <time datetime={new Date(gathering.startsAt).toISOString()}>
               <span class="sr-only">{accessibleDateFormat.format(gathering.startsAt)}</span>
               <span class="day" aria-hidden="true">{dayFormat.format(gathering.startsAt)}{#if locale === 'en'}<sup style="font-size: .4em; margin-left: .08em">{ordinalSuffix(Number(dayFormat.format(gathering.startsAt)))}</sup>{/if}</span>
-              <span class="month" aria-hidden="true">{monthFormat.format(gathering.startsAt)}</span>
+              <span class="month" aria-hidden="true"><span class="agenda-month-full">{monthFormat.format(gathering.startsAt)}</span><span class="agenda-month-compact">{compactMonthFormat.format(gathering.startsAt)}</span></span>
             </time>
             <p class="small">{t.dateDetail} · {gathering.venue}</p>
-            <p class="date-status">{statuses[gathering.availability as keyof typeof statuses]}</p>
-            {#if gathering.availability === 'not_open'}
-              <p class="small muted">{locale === 'nl' ? 'Aanmelden vanaf' : 'Registration opens'} <time datetime={new Date(gathering.registrationOpensAt).toISOString()}>{accessibleDateFormat.format(gathering.registrationOpensAt)}</time> · 00:00</p>
-            {/if}
-            {#if i >= 2}
-              <span class="future-label">{t.future}</span>
-            {/if}
+            <p class="date-status" data-availability={gathering.availability}>
+              {#if gathering.availability === 'not_open'}
+                {locale === 'nl' ? 'Opent' : 'Opens'} <time class="opening-date" datetime={new Date(gathering.registrationOpensAt).toISOString()} title={accessibleDateFormat.format(gathering.registrationOpensAt)}>{openingFormat.format(gathering.registrationOpensAt)}</time>
+              {:else}{statuses[gathering.availability as keyof typeof statuses]}{/if}
+            </p>
           </li>
         {/each}
       </ul>
@@ -298,7 +306,7 @@
     <p class="section-intro">{t.volunteerText}</p>
 
     <div class="role-grid">
-      {#each [{ title: t.guest, price: '€7', text: t.guestDetail }, { title: t.helper, price: '€7', text: t.helperDetail }, { title: t.chef, price: t.free, text: t.chefDetail }] as role}
+      {#each [{ title: t.guest, price: '€7', text: t.guestDetail }, { title: t.helper, price: '€7', text: t.helperDetail }, { title: t.mainChef, price: t.free, text: t.chefDetail }] as role}
         <article class="role-card">
           <div>
             <h3>{role.title}</h3>
@@ -326,9 +334,12 @@
   <!-- Join -->
   <section id="join" class="join-section section-space" aria-labelledby="join-title">
     <div class="page-width join-grid">
-      <div>
+      <div class="join-information">
+        <div class="join-introduction">
         <h2 id="join-title" class="section-title">{t.joinTitle}</h2>
         <p class="section-intro">{t.joinText}</p>
+        </div>
+        <div class="join-contact">
         <p class="contact-line">
           {t.emailLead} <a href={`mailto:${data.site.email}`}>{data.site.email}</a>.
         </p>
@@ -336,9 +347,11 @@
         <LocationCard venue={first.venue} address={first.address} mapsUrl={first.mapsUrl} mapsEmbedUrl={first.address===data.site.address?data.site.mapsEmbedUrl:undefined} {locale} />
 
         <Photo name="lange-tafel" alt={t.photoAlts['lange-tafel']} class="join-photo" />
+        </div>
       </div>
 
       <RegistrationForm
+        bind:selectedEventId
         ready={data.registrationReady}
         submissionToken={data.submissionToken}
         gatherings={data.gatherings}
