@@ -108,3 +108,17 @@ The participant editor keeps Role and Additional guests side by side in a two-co
 Role and Additional guests controls use matching 48px heights and bottom alignment, including when labels wrap.
 
 Participants with retained dietary/allergy notes show a yellow Allergy/Allergie badge with green text before their role, including on mobile. It disappears when the notes are purged or excluded after the dietary retention deadline.
+
+The combined gathering participant editor hides the email field and preserves the saved email when other details are edited. Public registration still requires email for participant communications.
+
+Valid chef cost edits immediately preview total costs, outstanding reimbursements and balance before saving on blur. Preview/Saving notices distinguish unsaved values. Responses refresh authoritative totals; errors remove the preview and restore the stored cost while showing the error. Server validation, versions and reimbursement history are unchanged.
+
+Chef grocery costs save on committed change as well as blur, with a pending guard against duplicate submissions, native validation feedback and a Saved confirmation.
+
+Amount fields now use typing-only editing with decimal mobile keyboards: native spinner arrows are hidden and Up/Down increments disabled. Grocery costs save on blur only, superseding change-event saving, to prevent repeated writes when stepping values. Live preview and Saved feedback remain.
+
+Removed the Saved confirmation label; Saving and error feedback remain available.
+
+Removed per-chef Saving text as well; shared gathering feedback and inline errors remain.
+
+To reimburse has a yellow background with green text while outstanding cents are positive; the highlight clears at zero and follows live previews.

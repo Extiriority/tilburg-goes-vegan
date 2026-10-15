@@ -5,6 +5,7 @@
     person,
     eventId,
     nl,
+    onCostPreview,
   }: {
     person: {
       id: string;
@@ -16,6 +17,7 @@
     };
     eventId: string;
     nl: boolean;
+    onCostPreview?: (id: string, cents: number | null, saving: boolean) => void;
   } = $props();
   let amount = $state(''),
     reimbursed = $state(false),
@@ -29,6 +31,7 @@
   const submit: SubmitFunction = () => {
     pending = true;
     message = '';
+    onCostPreview?.(person.id, Math.round(Number(amount) * 100), true);
     return async ({ update, result }) => {
       try {
         await update({ reset: false });
@@ -38,11 +41,23 @@
           message = nl ? 'Opslaan mislukt. Probeer opnieuw.' : 'Could not save. Try again.';
       } finally {
         pending = false;
+        onCostPreview?.(person.id, null, false);
+        amount = person.chef_cost_recorded_at === null ? '' : (person.chef_cost_cents / 100).toFixed(2);
         reimbursed =
           person.chef_cost_cents > 0 && person.chef_reimbursed_cents >= person.chef_cost_cents;
       }
     };
   };
+  function saveCost(field: HTMLInputElement) {
+    if (pending || field.value === '') return;
+    if (!field.validity.valid) {
+      field.reportValidity();
+      return;
+    }
+    if (person.chef_cost_recorded_at === null ||
+      Math.round(Number(field.value) * 100) !== person.chef_cost_cents)
+      field.form?.requestSubmit();
+  }
 </script>
 
 <div class="admin-chef-expenses" aria-busy={pending}>
@@ -63,6 +78,7 @@
       ><input
         name="amount"
         type="number"
+        inputmode="decimal"
         step="0.01"
         min="0"
         max="99999.99"
@@ -70,15 +86,17 @@
         placeholder="0.00"
         required
         disabled={pending}
-        onblur={(event) => {
-          if (
-            !pending &&
-            event.currentTarget.value !== '' &&
-            (person.chef_cost_recorded_at === null ||
-              Math.round(Number(event.currentTarget.value) * 100) !== person.chef_cost_cents)
-          )
-            event.currentTarget.form?.requestSubmit();
+        oninput={(event) => {
+          const field = event.currentTarget;
+          const cents = Math.round(Number(field.value) * 100);
+          onCostPreview?.(person.id, field.value !== '' && field.validity.valid &&
+            (person.chef_cost_recorded_at === null || cents !== person.chef_cost_cents)
+            ? cents : null, false);
         }}
+        onkeydown={(event) => {
+          if (event.key === 'ArrowUp' || event.key === 'ArrowDown') event.preventDefault();
+        }}
+        onblur={(event) => saveCost(event.currentTarget)}
       /></label
     >
     <noscript><button>{nl ? 'Kosten opslaan' : 'Save cost'}</button></noscript>

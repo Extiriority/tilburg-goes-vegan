@@ -9,6 +9,22 @@
   let creatingGathering = $state(false);
   let editingPerson = $state<string | null>(null);
   let nl = $derived($locale === 'nl');
+  let costDrafts = $state<Record<string, { event: string; cents: number; saving: boolean }>>({});
+  function previewCost(id: string, cents: number | null, saving: boolean) {
+    if (cents === null) {
+      const { [id]: removed, ...remaining } = costDrafts;
+      costDrafts = remaining;
+    } else {
+      costDrafts = { ...costDrafts, [id]: { event: data.selected?.id ?? '', cents, saving } };
+    }
+  }
+  let activeDrafts = $derived(data.people.filter(person => costDrafts[person.id]?.event === data.selected?.id));
+  let costDelta = $derived(activeDrafts.reduce((sum, person) => sum + costDrafts[person.id].cents - person.chef_cost_cents, 0));
+  let finance = $derived({ ...data.finance,
+    costs: data.finance.costs + costDelta,
+    outstanding: data.finance.outstanding + costDelta,
+    balance: data.finance.balance - costDelta,
+  });
   let date = $derived(
     new Intl.DateTimeFormat(nl ? 'nl-NL' : 'en-GB', {
       timeZone: 'Europe/Amsterdam',
@@ -170,15 +186,15 @@
         <dl>
           <div>
             <dt>{nl ? 'Ontvangen' : 'Received'}</dt>
-            <dd>{money.format(data.finance.received / 100)}</dd>
+            <dd>{money.format(finance.received / 100)}</dd>
           </div>
           <div>
             <dt>{nl ? 'Chefkosten' : 'Chef costs'}</dt>
-            <dd>{money.format(data.finance.costs / 100)}</dd>
+            <dd>{money.format(finance.costs / 100)}</dd>
           </div>
-          <div>
+          <div class:admin-reimbursement-due={finance.outstanding > 0}>
             <dt>
-              {data.finance.outstanding < 0
+              {finance.outstanding < 0
                 ? nl
                   ? 'Te veel vergoed'
                   : 'Over-reimbursed'
@@ -186,13 +202,16 @@
                   ? 'Nog te vergoeden'
                   : 'To reimburse'}
             </dt>
-            <dd>{money.format(Math.abs(data.finance.outstanding) / 100)}</dd>
+            <dd>{money.format(Math.abs(finance.outstanding) / 100)}</dd>
           </div>
-          <div class="admin-final-balance" class:negative={data.finance.balance < 0}>
+          <div class="admin-final-balance" class:negative={finance.balance < 0}>
             <dt>{nl ? 'Saldo na kosten' : 'Balance after costs'}</dt>
-            <dd>{money.format(data.finance.balance / 100)}</dd>
+            <dd>{money.format(finance.balance / 100)}</dd>
           </div>
         </dl>
+        {#if activeDrafts.length}<p class="small" role="status">{activeDrafts.some(person => costDrafts[person.id].saving)
+          ? nl ? 'Opslaan…' : 'Saving…'
+          : nl ? 'Voorbeeld — verlaat het kostenveld om op te slaan.' : 'Preview — leave the cost field to save.'}</p>{/if}
 
         {#if data.finance.missing}<p class="small form-notice">
             {nl
@@ -286,6 +305,7 @@
               </button>
               <AdminPersonControls
                 {person}
+                onCostPreview={previewCost}
                 eventId={gathering.id}
                 {nl}
                 startsAt={gathering.starts_at}
@@ -315,15 +335,11 @@
                         required
                       /></label
                     >
-                    {#if !person.walk_in}<label
-                        >{nl ? 'E-mail' : 'Email'}<input
-                          name="email"
-                          type="email"
-                          value={person.email_normalized ?? ''}
-                          maxlength="254"
-                          required
-                        /></label
-                      >{/if}
+                    {#if !person.walk_in}<input
+                        name="email"
+                        type="hidden"
+                        value={person.email_normalized ?? ''}
+                      />{/if}
                     <div class="full admin-role-guests">
                       {#if !person.walk_in}<label
                         >{nl ? 'Rol' : 'Role'}<select name="role" value={person.role}

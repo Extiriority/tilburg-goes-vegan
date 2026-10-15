@@ -9,6 +9,7 @@
     startsAt,
     now,
     cancelled,
+    onCostPreview,
   }: {
     person: {
       id: string;
@@ -29,6 +30,7 @@
     startsAt: number;
     now: number;
     cancelled: boolean;
+    onCostPreview?: (id: string, cents: number | null, saving: boolean) => void;
   } = $props();
   let pending = $state(false),
     message = $state(''),
@@ -110,6 +112,7 @@
       {person}
       {eventId}
       {nl}
+      {onCostPreview}
     />{/if}
   {#if fee > 0 || person.paid_at !== null}
     <form
@@ -130,6 +133,10 @@
         ><input
           name="amount"
           type="number"
+          inputmode="decimal"
+          onkeydown={(event) => {
+            if (event.key === 'ArrowUp' || event.key === 'ArrowDown') event.preventDefault();
+          }}
           step="7"
           min={paymentStepBase}
           max="99999.99"

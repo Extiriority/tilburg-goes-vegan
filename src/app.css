@@ -379,6 +379,7 @@
 .admin-balance-panel dd { margin: 2px 0 0; font-weight: 700; font-variant-numeric: tabular-nums; }
 .admin-final-balance { padding: 8px; background: #e0f2e4; color: #174a2a; border-radius: 8px; }
 .admin-final-balance.negative { background: #fbe2e9; color: #8a2346; }
+.admin-reimbursement-due { padding: 8px; background: #fff0b3; color: var(--color-forest); border-radius: 8px; }
 .admin-balance-panel > p { margin-bottom: 0; }
 
 .admin-person-controls { margin-left: auto; }
@@ -387,6 +388,9 @@
 .admin-payment-form .admin-currency-field > span[aria-hidden] { font-size: .9rem; color: var(--color-inksoft); }
 .admin-payment-form .admin-currency-field input[type=number] { border: 0; background: transparent; width: 70px; min-height: 42px; font-size: 1rem; }
 .admin-currency-field:focus-within { outline: 2px solid var(--color-forest); outline-offset: 2px; }
+.admin-currency-field input[type=number] { appearance: textfield; -moz-appearance: textfield; }
+.admin-currency-field input[type=number]::-webkit-inner-spin-button,
+.admin-currency-field input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 .admin-chef-expenses { flex: 0 1 auto; }
 .admin-chef-expenses .admin-payment-form .admin-currency-field { gap: 0; }
 .admin-person-controls .admin-paid-check { width: 124px; flex-shrink: 0; justify-content: flex-end; }

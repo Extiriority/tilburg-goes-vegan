@@ -2,6 +2,20 @@
 
 ## 2026-10-15
 
+- Highlighted outstanding reimbursements in yellow until the amount reaches zero, including during live cost previews.
+
+- Removed per-chef Saving text; retained shared gathering feedback and inline errors.
+
+- Removed the persistent Saved label from chef expense controls; pending-save and error feedback remain.
+
+- Removed amount-field spinner arrows and keyboard arrow increments; grocery costs preview while typing and save on blur rather than every committed number step.
+
+- Added grocery-cost save handling for both change and blur, explicit invalid-input feedback and a Saved confirmation.
+
+- Preview actual chef costs, outstanding reimbursements and balance immediately while typing; show pending saves and reconcile or restore server values after saving.
+
+- Removed the visible email field from the organizer participant editor while preserving saved email during edits and public registration requirements.
+
 - Added a yellow, green-text Allergy badge before participant roles when retained dietary/allergy notes are present.
 
 - Matched Role and Additional guests control heights and bottom alignment.
