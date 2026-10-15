@@ -1,0 +1,1 @@
+ALTER TABLE `walk_in_guests` ADD `source` text DEFAULT 'other' NOT NULL;
