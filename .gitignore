@@ -11,3 +11,4 @@ coverage/
 .dev.vars*
 *.log
 .idea
+/wrangler.staging.local.jsonc

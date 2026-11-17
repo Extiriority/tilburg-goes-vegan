@@ -11,10 +11,10 @@ import { register, RegistrationError } from '$lib/server/registrations/service';
 import { registrationWindow } from '$lib/server/events/window';
 import { publishedAnnouncements } from '$lib/server/admin/announcements';
 
-export const load = async ({ platform }: Parameters<PageServerLoad>[0]) => {
+export const load = async ({ platform, locals }: Parameters<PageServerLoad>[0]) => {
   const now = Date.now();
   const occurrences = upcomingOccurrences(now);
-  const ready=registrationEnabled(platform?.env);
+  const ready=registrationEnabled(platform?.env, locals.stagingAccess);
   const registration={registrationReady:ready,submissionToken:ready?await createSubmissionToken(platform!.env.MANAGEMENT_TOKEN_SECRET!):'',hasRecipes:false,announcements:[] as Awaited<ReturnType<typeof publishedAnnouncements>>};
   if (!platform?.env.DB) return { ...registration,site: confirmedSite, gatherings: occurrences.map((event) => ({ ...event, id:'', canRegister:false, registrationOpensAt:registrationOpensAt(event.startsAt), venue: confirmedSite.venue, address: confirmedSite.address, mapsUrl: confirmedSite.mapsUrl, availability: 'setup_pending' })) };
   const rows = await platform.env.DB.prepare(`
@@ -45,8 +45,8 @@ export const load = async ({ platform }: Parameters<PageServerLoad>[0]) => {
 };
 
 export const actions: Actions = {
-  register: async ({request,platform}) => {
-    if (!registrationEnabled(platform?.env)) return fail(503,{registrationError:'unavailable',registrationFields:[] as string[]});
+  register: async ({request,platform,locals}) => {
+    if (!registrationEnabled(platform?.env, locals.stagingAccess)) return fail(503,{registrationError:'unavailable',registrationFields:[] as string[]});
     const parsed=readRegistrationForm(await request.formData());
     if (!parsed.success) return fail(400,{registrationError:'invalid',registrationFields:[...new Set(parsed.error.issues.map(issue=>String(issue.path[0])))]});
     let token:string;

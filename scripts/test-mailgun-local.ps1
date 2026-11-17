@@ -1,14 +1,17 @@
 [CmdletBinding(DefaultParameterSetName = 'Plain')]
 param(
   [Parameter(ParameterSetName = 'Synthetic')][switch]$Registration,
-  [Parameter(ParameterSetName = 'Queue')][switch]$Queue
+  [Parameter(ParameterSetName = 'Queue')][switch]$Queue,
+  [Parameter(ParameterSetName = 'Queue')][switch]$Staging
 )
 
 $ErrorActionPreference = 'Stop'
+if ($Staging) { $Queue = $true }
 
 function Invoke-LocalOutbox {
   param([string[]]$Arguments)
   $prefix = 'TGV_OUTBOX_RESULT='
+  if ($Staging) { $Arguments = @('--staging') + $Arguments }
   $outputLines = & node --experimental-strip-types (Join-Path $PSScriptRoot 'local-outbox.mjs') @Arguments
   if ($LASTEXITCODE -ne 0) { throw 'Local outbox command failed.' }
   $resultLines = @($outputLines | Where-Object { $_.StartsWith($prefix, [StringComparison]::Ordinal) })
@@ -49,9 +52,9 @@ try {
     $html = $null
     if ($Queue) {
       try { $claim = Invoke-LocalOutbox -Arguments @('claim', $recipient) }
-      catch { throw 'Could not read the local queue result. No SMTP send was attempted.' }
+      catch { throw 'Could not read the queue result. No SMTP send was attempted.' }
       if (!$claim) { Write-Host 'No eligible queued confirmation for this address. No email was sent.'; return }
-      if ($claim.blocked) { throw 'The local management link could not be verified. The confirmation was held; no email was sent.' }
+      if ($claim.blocked) { throw 'The management link could not be verified. The confirmation was held; no email was sent.' }
       $subject = $claim.subject
       $body = $claim.body
       $html = $claim.html

@@ -1,0 +1,24 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "tilburg-goes-vegan-staging",
+  "main": ".svelte-kit/cloudflare-staging/_worker.js",
+  "compatibility_date": "2026-10-14",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "preview_urls": false,
+  "vars": {
+    "APP_ENV": "staging",
+    "REGISTRATION_ENABLED": "true",
+    "STAGING_ORIGIN": "REPLACE_WITH_HTTPS_STAGING_ORIGIN",
+    "ACCESS_ISSUER": "REPLACE_WITH_HTTPS_ACCESS_TEAM_DOMAIN",
+    "ACCESS_AUDIENCE": "REPLACE_WITH_WORKER_ACCESS_APPLICATION_AUD"
+  },
+  "assets": { "directory": ".svelte-kit/cloudflare-staging", "binding": "ASSETS" },
+  "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "tgv-media-staging", "jurisdiction": "eu" }],
+  "d1_databases": [{
+    "binding": "DB",
+    "database_name": "tgv-staging",
+    "database_id": "REPLACE_WITH_STAGING_DATABASE_ID",
+    "migrations_dir": "drizzle"
+  }]
+}

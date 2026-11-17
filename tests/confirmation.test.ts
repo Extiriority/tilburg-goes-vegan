@@ -12,4 +12,10 @@ it('renders a localized, escaped confirmation with the same private link in both
   expect(mail.html).toContain('&lt;img&gt;');
   expect(mail.html).not.toContain('<img>');
   expect(renderLocalConfirmation({ ...input, locale: 'en' }).body).toContain('Manage my registration: ' + url);
+  const stagingOrigin = 'https://tilburg-goes-vegan-staging.example.invalid';
+  const staging = renderLocalConfirmation({ ...input, locale: 'en', stagingOrigin });
+  const stagingUrl = stagingOrigin + '/registration/manage/synthetic.token';
+  expect(staging.html).toContain('href="' + stagingUrl + '"');
+  expect(staging.body).toContain('Manage my registration: ' + stagingUrl);
+  expect(staging.body).toContain('Cloudflare Access');
 });
