@@ -12,3 +12,4 @@ coverage/
 *.log
 .idea
 /wrangler.staging.local.jsonc
+/wrangler.staging-mail.local.jsonc

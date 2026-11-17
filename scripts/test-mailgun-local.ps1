@@ -71,15 +71,24 @@ try {
       $message.Headers.Add('X-Mailgun-Track-Clicks', 'no')
       $message.Headers.Add('X-Mailgun-Track-Opens', 'no')
       $outcome = 'uncertain'
+      $diagnostics = @()
       try { $client.Send($message); $outcome = 'accepted' }
       catch {
         $cause = $_.Exception
-        while ($cause -and $cause -isnot [System.Net.Mail.SmtpException]) { $cause = $cause.InnerException }
-        if ($cause) {
-          $code = [int]$cause.StatusCode
-          if ($code -in 421, 450, 451, 452, 454) { $outcome = 'temporary' }
-          elseif ($code -ge 500 -and $code -lt 600) { $outcome = 'permanent' }
+        while ($cause) {
+          if ($cause -is [System.Net.Mail.SmtpException]) {
+            $code = [int]$cause.StatusCode
+            $diagnostics += "SMTP status $code"
+            if ($code -in 421, 450, 451, 452, 454) { $outcome = 'temporary' }
+            elseif ($code -ge 500 -and $code -lt 600) { $outcome = 'permanent' }
+          } elseif ($cause -is [System.Net.Sockets.SocketException]) {
+            $diagnostics += "Network error $($cause.SocketErrorCode)"
+          } else {
+            $diagnostics += $cause.GetType().Name
+          }
+          $cause = $cause.InnerException
         }
+        Write-Warning ($diagnostics -join ' / ')
       }
       if ($claim) {
         try { $result = Invoke-LocalOutbox -Arguments @('finish', $claim.id, [string]$claim.attempts, $outcome) }
