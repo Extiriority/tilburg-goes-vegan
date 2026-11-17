@@ -11,9 +11,11 @@ export function mondayStartsAt(startsAt: number) {
 
 // Include this before a post-cutoff registration write in the SAME batch.
 // A delayed scheduler must not count a cancellation after it has freed a seat.
-export function freezeMealAllocation(db: D1Database, eventId: string, now: number) {
+export function freezeMealAllocation(db: D1Database, eventId: string, now: number, participant?: { id: string; version: number; walkIn: boolean }) {
+  const match = participant ? `AND EXISTS (SELECT 1 FROM ${participant.walkIn ? 'walk_in_guests' : 'registrations'} WHERE event_id=events.id AND id=? AND version=?)` : '';
   return db.prepare(`UPDATE events SET meal_allocation=(SELECT COALESCE(sum(seats),0) FROM confirmed_participants WHERE event_id=events.id AND status='confirmed')
-    WHERE id=? AND status='scheduled' AND meal_allocation IS NULL AND registration_cutoff<=MAX(?,${SQL_NOW})`).bind(eventId,now);
+    WHERE id=? AND status='scheduled' AND meal_allocation IS NULL AND registration_cutoff<=MAX(?,${SQL_NOW}) ${match}`)
+    .bind(eventId,now,...(participant ? [participant.id, participant.version] : []));
 }
 
 const candidateSql = `SELECT r.id,r.version FROM registrations r JOIN events e ON e.id=r.event_id

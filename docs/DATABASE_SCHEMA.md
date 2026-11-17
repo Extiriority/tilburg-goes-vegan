@@ -1,5 +1,7 @@
 # Database design
 
+Migration 0019 adds announcements with a title, plain-text message, UTC update/publication timestamps and optimistic version. A null publication timestamp hides the entry; the public query returns only the five newest published posts.
+
 Migration 0018 adds recipes.allergens, a JSON array of canonical allergen IDs (default []). Server validation rejects unknown IDs and canonicalizes duplicates before version-checked publication.
 
 Migration 0016 adds recipes.notes (validated numbered-note/target JSON, default []), youtube_video_id (validated video ID), nullable serving_grams and calories_kcal. Existing ordered recipe ingredient/step tables remain unchanged. The server validates reference indices and list limits before atomic publication.

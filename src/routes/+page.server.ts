@@ -1,4 +1,4 @@
-import { upcomingOccurrences, availability, registrationOpensAt } from '$lib/server/events/schedule';
+import { upcomingOccurrences, availability, registrationOpensAt, UPCOMING_COUNT } from '$lib/server/events/schedule';
 import type { PageServerLoad } from './$types';
 import type { Actions } from './$types';
 import { confirmedSite } from '$lib/server/site';
@@ -9,22 +9,27 @@ import { createSubmissionToken } from '$lib/server/registrations/tokens';
 import { readRegistrationForm } from '$lib/server/registrations/validation';
 import { register, RegistrationError } from '$lib/server/registrations/service';
 import { registrationWindow } from '$lib/server/events/window';
+import { publishedAnnouncements } from '$lib/server/admin/announcements';
 
-export const load: PageServerLoad = async ({ platform }) => {
+export const load = async ({ platform }: Parameters<PageServerLoad>[0]) => {
   const now = Date.now();
   const occurrences = upcomingOccurrences(now);
   const ready=registrationEnabled(platform?.env);
-  const registration={registrationReady:ready,submissionToken:ready?await createSubmissionToken(platform!.env.MANAGEMENT_TOKEN_SECRET!):'',hasRecipes:false};
+  const registration={registrationReady:ready,submissionToken:ready?await createSubmissionToken(platform!.env.MANAGEMENT_TOKEN_SECRET!):'',hasRecipes:false,announcements:[] as Awaited<ReturnType<typeof publishedAnnouncements>>};
   if (!platform?.env.DB) return { ...registration,site: confirmedSite, gatherings: occurrences.map((event) => ({ ...event, id:'', canRegister:false, registrationOpensAt:registrationOpensAt(event.startsAt), venue: confirmedSite.venue, address: confirmedSite.address, mapsUrl: confirmedSite.mapsUrl, availability: 'setup_pending' })) };
   const rows = await platform.env.DB.prepare(`
     SELECT e.id,e.occurrence_key,e.starts_at,e.ends_at,e.registration_cutoff,e.capacity,e.status,v.name AS venue,v.address,
       (SELECT COALESCE(sum(seats),0) FROM confirmed_participants r WHERE r.event_id=e.id) AS confirmed
-    FROM events e JOIN venues v ON v.id=e.venue_id WHERE e.ends_at>? ORDER BY e.starts_at,e.id LIMIT 4
-  `).bind(now).all<{
+    FROM events e JOIN venues v ON v.id=e.venue_id WHERE e.ends_at>? ORDER BY e.starts_at,e.id LIMIT ?
+  `).bind(now, UPCOMING_COUNT).all<{
     id:string; occurrence_key: string; starts_at: number; ends_at: number; registration_cutoff: number;
     capacity: number; status: string; confirmed: number; venue: string; address: string;
   }>();
-  const hasRecipes=!!await platform.env.DB.prepare('SELECT id FROM recipes LIMIT 1').first();
+  const [recipe, announcements] = await Promise.all([
+    platform.env.DB.prepare('SELECT id FROM recipes LIMIT 1').first(),
+    publishedAnnouncements(platform.env.DB),
+  ]);
+  const hasRecipes = !!recipe;
   const gatherings=await Promise.all(rows.results.map(async(row)=>{
     const window=await registrationWindow(platform.env.DB,row.id);
     const opensAt=window?.opensAt??registrationOpensAt(row.starts_at);
@@ -36,7 +41,7 @@ export const load: PageServerLoad = async ({ platform }) => {
       availability: availability({ registrationOpensAt:opensAt, status: row.status, registrationCutoff: row.registration_cutoff, capacity: row.capacity }, row.confirmed, now)
     };
   }));
-  return { ...registration,hasRecipes,site: confirmedSite,gatherings:gatherings.length?gatherings:occurrences.map(occurrence=>({...occurrence,id:'',canRegister:false,registrationOpensAt:registrationOpensAt(occurrence.startsAt),venue:confirmedSite.venue,address:confirmedSite.address,mapsUrl:confirmedSite.mapsUrl,availability:'setup_pending'})) };
+  return { ...registration,hasRecipes,announcements,site: confirmedSite,gatherings:gatherings.length?gatherings:occurrences.map(occurrence=>({...occurrence,id:'',canRegister:false,registrationOpensAt:registrationOpensAt(occurrence.startsAt),venue:confirmedSite.venue,address:confirmedSite.address,mapsUrl:confirmedSite.mapsUrl,availability:'setup_pending'})) };
 };
 
 export const actions: Actions = {

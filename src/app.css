@@ -2,6 +2,16 @@
 @import '@fontsource-variable/fredoka';
 @import '@fontsource-variable/karla';
 
+.announcement-list { display: grid; gap: 12px; margin-top: 20px; }
+.participant-delete { margin-top: 16px; }
+.participant-delete summary { cursor: pointer; color: var(--color-raspd); }
+.participant-delete form { display: grid; justify-items: start; gap: 8px; margin-top: 8px; }
+#announcements { padding-bottom: 24px; }
+#announcements + #evening { padding-top: 24px; }
+.announcement-card { padding: clamp(16px, 3vw, 28px); border-inline-start: 4px solid var(--color-forest); overflow-wrap: anywhere; }
+.announcement-card h3 { color: var(--color-forest); }
+.announcement-card p { margin-top: 8px; white-space: pre-wrap; }
+
 @theme {
   --color-paper: #fdfbf4; --color-paper2: #f7f3e6; --color-butter: #f6eaae;
   --color-zest: #ffe81c; --color-rasp: #be4175; --color-raspd: #9d2f5e;

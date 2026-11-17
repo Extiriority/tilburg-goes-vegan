@@ -2,6 +2,12 @@
 
 Version 1.0 | 14 October 2026
 
+Private management deadline amendment: participants can edit or cancel before the scheduled dinner start. Their private link remains available for viewing until dinner ends. The earlier Saturday confirmation deadline still applies.
+
+Gathering horizon amendment: maintain six upcoming fortnightly occurrences for planning. The homepage and its registration picker receive only the next four, with the existing next-two registration opening rules. Dates beyond the public horizon are labelled admin-only in the organizer picker. Local operations replenish the horizon without replacing edits or cancellations; production scheduling remains pending.
+
+Announcements amendment: authenticated organizers can post, edit, hide and delete plain-text announcements at /admin/announcements. The homepage cycles through up to five published announcements, newest first, and omits the section when empty. Visitors can pause and navigate manually; reduced-motion preferences disable autoplay by default. UI labels are bilingual; messages appear as written. Announcements do not send email.
+
 16 October recipe photo amendment: one optional image per recipe, automatically used as cover, with replacement, deletion and accessible description editing. This supersedes multiple-image/ordering requirements for recipes. Existing multi-photo recipes remain intact until explicit replacement/deletion. No deployment.
 
 Admin increment: local shared organizer login, editable registration/waiting lists, gathering date/venue/capacity edits and cancellation, contacted-person promotion, and immediate recipe/photo publication are implemented. For special dates, registration always closes on the latest preceding Saturday at 16:00; automatic promotion stops at gathering-day midnight, and contacted-person manual promotion is allowed on that day before 19:00. See ADMIN.md. Production access and password-reset email remain disabled/pending.

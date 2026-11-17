@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { Miniflare } from 'miniflare';
-import { beforeEach, afterEach, it, expect } from 'vitest';
+import { beforeEach, afterEach, it, expect, vi } from 'vitest';
 import {
   hashPassword,
   verifyPassword,
@@ -431,7 +431,15 @@ import {
 } from '../src/lib/server/admin/gathering-participants';
 import { cleanupPrivacy } from '../src/lib/server/privacy/cleanup';
 import { load as overviewLoad } from '../src/routes/admin/(panel)/+page.server';
-import { load as gatheringLoad } from '../src/routes/admin/(panel)/events/+page.server';
+import { load as loadGatherings } from '../src/routes/admin/(panel)/events/+page.server';
+async function gatheringLoad(request: Parameters<typeof loadGatherings>[0]) {
+  return atFixtureTime(() => loadGatherings(request));
+}
+async function atFixtureTime<T>(read: () => Promise<T>) {
+  const now = vi.spyOn(Date, 'now').mockImplementation(() => clock);
+  try { return await read(); }
+  finally { now.mockRestore(); }
+}
 const walkIn = (extra: Record<string, unknown> = {}) =>
   walkInInput.parse({
     id: crypto.randomUUID(),
@@ -641,7 +649,7 @@ it('defaults to the next gathering, combines both participant types and orders b
   });
   expect(data.selected?.confirmed).toBe(2);
   expect(data.selected?.budget).toEqual({ starter: 0, main: 0, dessert: 0 });
-  const overview = await overviewLoad(request as unknown as Parameters<typeof overviewLoad>[0]);
+  const overview = await atFixtureTime(() => overviewLoad(request as unknown as Parameters<typeof overviewLoad>[0]));
   expect(overview.counts.find((r) => r.status === 'confirmed')?.total).toBe(2);
   expect(overview.counts.find((r) => r.status === 'no_show')?.total).toBe(1);
 });
@@ -1016,4 +1024,38 @@ it('matches the organizer budget table at ten and twenty people, excluding other
   const withUnannounced = await gatheringLoad(request);
   expect(withUnannounced.selected?.confirmed).toBe(23);
   expect(withUnannounced.selected?.budget).toEqual({starter:34,main:51,dessert:34});
+});
+import { announcementInput, deleteAnnouncement, publishedAnnouncements, saveAnnouncement } from '../src/lib/server/admin/announcements';
+import { maintainUpcomingEvents } from '../src/lib/server/events/repository';
+import { load as loadHomepage } from '../src/routes/+page.server';
+
+it('returns four public dates and labels the two planning dates in admin', async () => {
+  await db.prepare("UPDATE events SET occurrence_key='2026-10-26' WHERE id='e'").run();
+  await maintainUpcomingEvents(db, clock);
+  const request = {
+    platform: { env: { DB: timed } },
+    locals: { admin: { id: 'admin' } },
+    url: new URL('http://localhost/admin/events'),
+  } as unknown as Parameters<typeof loadGatherings>[0];
+  const organizer = await gatheringLoad(request);
+  const homepage = await atFixtureTime(() => Promise.resolve(loadHomepage(request as unknown as Parameters<typeof loadHomepage>[0])));
+  expect(organizer.rows).toHaveLength(6);
+  expect(homepage.gatherings.map(row => row.id)).toEqual(organizer.rows.slice(0,4).map(row => row.id));
+  expect(organizer.adminOnlyIds).toEqual(organizer.rows.slice(4).map(row => row.id));
+});
+
+it('publishes only visible announcements and rejects stale edits', async () => {
+  const post = announcementInput.parse({ id: '', version: '0', title: ' Dinner update ', body: 'Doors open at 18:00.', published: true });
+  expect(announcementInput.safeParse({ ...post, version: '0', body: '   ' }).success).toBe(false);
+  const id = (await saveAnnouncement(db, post, clock))!;
+  await saveAnnouncement(db, { ...post, title: 'Private draft', published: false }, clock);
+  expect(await publishedAnnouncements(db)).toEqual([{ id, title: 'Dinner update', body: post.body }]);
+  expect(await saveAnnouncement(db, { ...post, id, body: 'Updated time.' }, clock + 1)).toBe(id);
+  expect(await saveAnnouncement(db, { ...post, id, published: false }, clock + 2)).toBeNull();
+  expect((await publishedAnnouncements(db))[0]?.body).toBe('Updated time.');
+  await saveAnnouncement(db, { ...post, id, version: 1, published: false }, clock + 3);
+  expect(await publishedAnnouncements(db)).toEqual([]);
+  expect(await deleteAnnouncement(db, id, 1)).toBe(false);
+  expect(await deleteAnnouncement(db, id, 2)).toBe(true);
+  expect(await deleteAnnouncement(db, id, 2)).toBe(false);
 });

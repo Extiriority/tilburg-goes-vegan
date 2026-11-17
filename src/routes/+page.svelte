@@ -1,4 +1,5 @@
 <script lang="ts">
+  import AnnouncementCarousel from '$lib/components/AnnouncementCarousel.svelte';
   import { messages } from '$lib/i18n';
   import { siteCopy } from '$lib/site-copy';
   import Photo from '$lib/components/Photo.svelte';
@@ -209,6 +210,8 @@
     </div>
     <HeroDivider />
   </section>
+
+  {#if data.announcements.length}<AnnouncementCarousel posts={data.announcements} nl={locale === 'nl'} />{/if}
 
   <!-- Evening -->
   <section id="evening" class="page-width section-space" aria-labelledby="evening-title">

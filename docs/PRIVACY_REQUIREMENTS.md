@@ -1,5 +1,7 @@
 # Privacy and retention
 
+Organizers can permanently delete one participant from the gathering editor. The local database removes the registration or walk-in and all linked tokens, mutation receipts, attendance markers and outbox/attempt records. Gathering-wide counts, shared dietary reports and non-identifying audits are separate. Previously sent email, provider logs, backups and other external copies are not removed by this action.
+
 Recipe YouTube tutorials render a local load button first. No YouTube iframe or remote thumbnail loads until the visitor chooses to load the tutorial. The resulting youtube-nocookie.com embed still connects to a third party; the bilingual UI and privacy page explain this.
 
 The local organizer panel is authenticated, no-store and noindex. Admin queries omit identity after +7 days and dietary data after +24 hours even if cleanup is delayed. Dietary notes are view-only; organizer edits do not invent participant consent. Audits record action/event/admin only; no participant text or bearer credentials. Recipe image conversion strips original metadata before optimized variants are uploaded. See ADMIN.md for access and remaining production gates.

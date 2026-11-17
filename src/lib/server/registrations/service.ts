@@ -1,8 +1,8 @@
-import { hashToken, managementToken, verifySubmissionToken } from './tokens';
+import { hashToken, managementToken, verifySubmissionToken } from './tokens.ts';
 import type { RegistrationInput, DetailsInput } from './validation';
-import { localInstant, TIMEZONE, registrationOpensAt } from '../events/schedule';
-import { freezeMealAllocation } from '../events/waiting-list';
-import { registrationWindow,priorDinnerSql } from '../events/window';
+import { localInstant, TIMEZONE, registrationOpensAt } from '../events/schedule.ts';
+import { freezeMealAllocation } from '../events/waiting-list.ts';
+import { registrationWindow,priorDinnerSql } from '../events/window.ts';
 
 const DAY = 86_400_000;
 // UTC seconds suffice for the whole-second Amsterdam deadlines; use DB time
@@ -107,6 +107,7 @@ export async function changeRegistration(db: D1Database, token: string, action: 
   if (!current) throw new RegistrationError('invalid_token');
   if (current.version !== expectedVersion) throw new RegistrationError('conflict');
   if (action==='cancel' && current.status==='cancelled') return current;
+  if (now>=current.starts_at) throw new RegistrationError('closed');
   if (current.status==='cancelled' || (action!=='cancel' && current.event_status==='cancelled')) throw new RegistrationError('invalid_transition');
   if (action==='confirm' && current.status!=='undecided') throw new RegistrationError('invalid_transition');
   if (action==='confirm' && now>=current.registration_cutoff) throw new RegistrationError('closed');
@@ -120,11 +121,11 @@ export async function changeRegistration(db: D1Database, token: string, action: 
   const validToken=`AND EXISTS (SELECT 1 FROM registration_tokens WHERE registration_id=registrations.id AND token_hash=? AND revoked_at IS NULL AND expires_at>MAX(?,${SQL_NOW}))`;
   const update = action==='details'
     ? db.prepare(`UPDATE registrations SET dietary_notes=?,dietary_consent_at=?,comments=?,version=version+1,updated_at=?
-        WHERE id=? AND version=? AND status<>'cancelled' AND EXISTS (SELECT 1 FROM events WHERE id=event_id AND status='scheduled' AND ends_at>MAX(?,${SQL_NOW})
+        WHERE id=? AND version=? AND status<>'cancelled' AND EXISTS (SELECT 1 FROM events WHERE id=event_id AND status='scheduled' AND starts_at>MAX(?,${SQL_NOW})
           AND (registration_cutoff>${SQL_NOW} OR meal_allocation IS NOT NULL)) ${validToken}`)
       .bind(details!.dietaryNotes,details!.dietaryNotes?now:null,details!.comments,now,current.id,expectedVersion,now,tokenHash,now)
     : db.prepare(`UPDATE registrations SET previous_status=status,status=?,version=version+1,updated_at=? WHERE id=? AND version=? AND status=?
-        AND EXISTS (SELECT 1 FROM events e WHERE id=event_id AND ends_at>MAX(?,${SQL_NOW})
+        AND EXISTS (SELECT 1 FROM events e WHERE id=event_id AND starts_at>MAX(?,${SQL_NOW})
           AND (status='cancelled' OR registration_cutoff>${SQL_NOW} OR meal_allocation IS NOT NULL)
           ${action==='confirm'?`AND status='scheduled' AND registration_cutoff>MAX(?,${SQL_NOW}) AND starts_at=? AND (${priorDinnerSql}) IS ? AND ?<=MIN(?,${SQL_NOW})
             AND NOT EXISTS (SELECT 1 FROM registrations w WHERE w.event_id=e.id AND w.status='waiting_list' AND w.anonymized_at IS NULL

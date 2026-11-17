@@ -3,9 +3,10 @@ import { cleanupPrivacy } from '../src/lib/server/privacy/cleanup.ts';
 import { processWaitingLists } from '../src/lib/server/events/waiting-list.ts';
 import { expireUndecided } from '../src/lib/server/events/undecided.ts';
 import { queueDueReminders } from '../src/lib/server/events/reminders.ts';
+import { maintainUpcomingEvents } from '../src/lib/server/events/repository.ts';
 
 const args = process.argv.slice(2);
-if (args.some(arg => arg !== '--watch')) throw new Error('Only --watch is supported; this command is local-only.');
+if (args.some(arg => arg !== '--watch' && arg !== '--schedule-only')) throw new Error('Only --watch and --schedule-only are supported; this command is local-only.');
 const watch = args.includes('--watch');
 const proxy = await getPlatformProxy({ configPath: 'wrangler.jsonc', persist: true, remoteBindings: false });
 let timer;
@@ -21,11 +22,16 @@ process.once('SIGTERM', stop);
 async function run() {
   running = true;
   try {
+    const schedule = await maintainUpcomingEvents(proxy.env.DB, Date.now());
+    if (args.includes('--schedule-only')) {
+      console.log('Local schedule:', schedule);
+      return;
+    }
     const cleanup = await cleanupPrivacy(proxy.env.DB);
     const undecided = await expireUndecided(proxy.env.DB);
     const waitingList = await processWaitingLists(proxy.env.DB);
     const reminders = await queueDueReminders(proxy.env.DB);
-    const result = { cleanup, undecided, waitingList, reminders };
+    const result = { schedule, cleanup, undecided, waitingList, reminders };
     console.log('Local operations:', result);
   } catch {
     console.error('Local operations failed. Check local migrations and database access.');

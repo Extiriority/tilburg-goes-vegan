@@ -19,7 +19,8 @@ export const load:PageServerLoad=async({platform,params,url})=>{
   } } catch { /* Do not log bearer URLs or participant data. */ }
   return {registration,managementUrl:url.origin+url.pathname,site:confirmedSite,
     invite:coordinationInvite(registration,platform?.env.WHATSAPP_INVITE_URL),
-    editable:registrationEnabled(platform?.env),late:registration?Date.now()>=registration.registration_cutoff:false};
+    editable:registrationEnabled(platform?.env), started:registration ? Date.now()>=registration.starts_at : false,
+    late:registration?Date.now()>=registration.registration_cutoff:false};
 };
 
 function action(kind:'cancel'|'confirm'|'details'):Actions[string] {

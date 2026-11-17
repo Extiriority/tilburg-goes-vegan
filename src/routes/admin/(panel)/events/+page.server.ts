@@ -34,6 +34,8 @@ import {
 import { z } from 'zod';
 import { expireUndecided } from '$lib/server/events/undecided';
 import { mondayStartsAt } from '$lib/server/events/waiting-list';
+import { UPCOMING_COUNT } from '$lib/server/events/schedule';
+import { deleteParticipant } from '$lib/server/privacy/delete-participant';
 import { getGatheringDietary, saveGatheringDietary } from '$lib/server/admin/gathering-dietary';
 export const load = async (event: import('./$types').PageServerLoadEvent) => {
   const { db } = requireAdmin(event);
@@ -58,6 +60,7 @@ export const load = async (event: import('./$types').PageServerLoadEvent) => {
       unannounced: number;
     }>();
   const now = Date.now();
+  const publicIds = new Set(rows.results.filter(row => row.ends_at > now).slice(0, UPCOMING_COUNT).map(row => row.id));
   const requested = event.url.searchParams.get('event');
   const selected =
     rows.results.find((r) => r.id === requested) ??
@@ -123,6 +126,7 @@ export const load = async (event: import('./$types').PageServerLoadEvent) => {
   }));
   return {
     rows: mapped,
+    adminOnlyIds: rows.results.filter(row => row.ends_at > now && !publicIds.has(row.id)).map(row => row.id),
     selected: mapped.find((r) => r.id === selected?.id),
     people: people.results.map(({ dietary_notes, ...person }) => person),
     dietaryNotes: dietary.notes,
@@ -223,6 +227,24 @@ export const actions = {
     }
   },
   personSave: participantActions.save,
+  deletePerson: async (event) => {
+    const { db } = requireAdmin(event);
+    const fields = await event.request.formData();
+    const input = z.object({
+      id: z.string().min(1).max(100),
+      eventId: z.string().min(1).max(100),
+      version: z.string().regex(/^\d+$/).transform(Number).pipe(z.number().int().nonnegative()),
+    }).safeParse(Object.fromEntries(fields));
+    if (!input.success) return adminFail(event.locals.locale, 400, 'Could not save, try again');
+    const { id, eventId, version } = input.data;
+    try {
+      if (!await deleteParticipant(db, eventId, id, version))
+        return adminFail(event.locals.locale, 409, 'Could not save, try again');
+      return { deleted: true, saved: false };
+    } catch {
+      return adminFail(event.locals.locale, 409, 'Could not save, try again');
+    }
+  },
   personCancel: participantActions.cancel,
   promote: participantActions.promote,
   addPerson: async (event) => {

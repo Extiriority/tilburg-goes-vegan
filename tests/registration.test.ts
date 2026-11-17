@@ -4,6 +4,8 @@ import { beforeEach, afterEach, expect, it } from 'vitest';
 import { register, changeRegistration, getManagedRegistration } from '../src/lib/server/registrations/service';
 import { createSubmissionToken, hashToken, managementToken, verifySubmissionToken } from '../src/lib/server/registrations/tokens';
 import { registrationInput, detailsInput } from '../src/lib/server/registrations/validation';
+import { claimLocalConfirmation, finishLocalConfirmation } from '../src/lib/server/email/local-outbox';
+import { deleteParticipant } from '../src/lib/server/privacy/delete-participant';
 
 const secret='test-only-key-not-for-production-use-123456789';
 let mf: Miniflare;
@@ -21,6 +23,64 @@ beforeEach(async () => {
 afterEach(async()=>{await mf?.dispose();});
 const input=async(email='test@example.invalid',role:'guest'|'chef'|'helper_chef'='guest',undecided=false)=>registrationInput.parse({eventId:'e',fullName:'Test person',email,role,language:'nl',undecided,dietaryNotes:'',dietaryConsent:false,comments:'',submissionToken:await createSubmissionToken(secret)});
 const n=async(table:string,where='1=1')=>(await db.prepare(`SELECT count(*) AS n FROM ${table} WHERE ${where}`).first<{n:number}>())!.n;
+
+it('allows late edits before dinner but switches the private link to view-only at the start', async () => {
+  const { token, registration } = await register(db, secret, await input(), now);
+  const starts = registration.starts_at;
+  const details = detailsInput.parse({ version: 0, dietaryNotes: '', dietaryConsent: false, comments: 'Before dinner' });
+  expect((await changeRegistration(db, token, 'details', 0, details, starts - 1)).comments).toBe('Before dinner');
+  await expect(changeRegistration(db, token, 'details', 1, details, starts)).rejects.toMatchObject({ code: 'closed' });
+  await expect(changeRegistration(db, token, 'cancel', 1, undefined, starts)).rejects.toMatchObject({ code: 'closed' });
+  expect((await getManagedRegistration(db, token, starts))?.status).toBe('confirmed');
+});
+
+it('permanently deletes only the selected participant and their linked records', async () => {
+  const value = await input();
+  const person = await register(db, secret, value, now);
+  await register(db, secret, await input('keep@example.invalid'), now);
+  const claimed = (await claimLocalConfirmation(db, value.email, now))!;
+  await finishLocalConfirmation(db, claimed.id, claimed.attempts, 'accepted', now);
+  await changeRegistration(db, person.token, 'details', 0, detailsInput.parse({ version: 0, dietaryNotes: 'Test allergy', dietaryConsent: true, comments: 'Test notes' }), now);
+  expect(await deleteParticipant(db, 'wrong-event', person.registration.id, 1, now)).toBe(false);
+  expect(await deleteParticipant(db, 'e', person.registration.id, 0, now)).toBe(false);
+  expect(await n('email_attempts')).toBe(1);
+  expect(await deleteParticipant(db, 'e', person.registration.id, 1, now)).toBe(true);
+  expect(await getManagedRegistration(db, person.token, now)).toBeNull();
+  expect(await n('registrations')).toBe(1);
+  expect(await n('registration_tokens')).toBe(1);
+  expect(await n('registration_mutations')).toBe(0);
+  expect(await n('email_outbox')).toBe(1);
+  expect(await n('email_attempts')).toBe(0);
+});
+
+it('claims a queued confirmation once, backs off temporary failures and holds uncertain sends', async () => {
+  const value = await input();
+  await register(db, secret, value, now);
+  expect(await claimLocalConfirmation(db, 'other@example.invalid', now)).toBeNull();
+  const claims = await Promise.all([claimLocalConfirmation(db, value.email, now), claimLocalConfirmation(db, value.email, now)]);
+  expect(claims.filter(Boolean)).toHaveLength(1);
+  const first = claims.find(Boolean)!;
+  expect(await claimLocalConfirmation(db, value.email, now + 120001)).toBeNull();
+  expect(await finishLocalConfirmation(db, first.id, first.attempts, 'temporary', now)).toBe('pending');
+  expect(await claimLocalConfirmation(db, value.email, now + 59999)).toBeNull();
+  const second = (await claimLocalConfirmation(db, value.email, now + 60000))!;
+  expect(second.attempts).toBe(2);
+  expect(await finishLocalConfirmation(db, first.id, first.attempts, 'accepted', now + 60000)).toBeNull();
+  expect(await finishLocalConfirmation(db, second.id, second.attempts, 'uncertain', now + 60000)).toBe('failed');
+  expect(await claimLocalConfirmation(db, value.email, now + 3600000)).toBeNull();
+  expect(await n('email_attempts')).toBe(2);
+});
+
+it('records acceptance and leaves cancelled registrations unsent', async () => {
+  const value = await input();
+  await register(db, secret, value, now);
+  const cancelled = await register(db, secret, await input('cancelled@example.invalid'), now);
+  await changeRegistration(db, cancelled.token, 'cancel', 0, undefined, now);
+  expect(await claimLocalConfirmation(db, 'cancelled@example.invalid', now)).toBeNull();
+  const item = (await claimLocalConfirmation(db, value.email, now))!;
+  expect(await finishLocalConfirmation(db, item.id, item.attempts, 'accepted', now)).toBe('sent');
+  expect(await claimLocalConfirmation(db, value.email, now)).toBeNull();
+});
 
 it('rejects direct submissions for gray gatherings and opens exactly at local midnight',async()=>{
   const starts=Date.parse('2026-11-23T18:00:00Z');

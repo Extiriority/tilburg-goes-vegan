@@ -11,6 +11,15 @@ import {
 const id = () => text('id').primaryKey();
 const created = () => integer('created_at').notNull(); // UTC epoch milliseconds everywhere.
 
+export const announcements = sqliteTable('announcements', {
+  id: id(),
+  title: text('title').notNull(),
+  body: text('body').notNull(),
+  publishedAt: integer('published_at'),
+  updatedAt: integer('updated_at').notNull(),
+  version: integer('version').notNull().default(0),
+}, (t) => [index('announcements_published').on(t.publishedAt)]);
+
 // Gatherings and defaults
 export const gatheringDietary = sqliteTable('gathering_dietary', {
   eventId: text('event_id')

@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
-import { upcomingOccurrences } from '../src/lib/server/events/schedule.ts';
+import { PLANNED_COUNT, upcomingOccurrences } from '../src/lib/server/events/schedule.ts';
 
 // Local-only bootstrap: never invokes remote migrations, deployments or email.
 const varsPath=resolve('.dev.vars');
@@ -19,7 +19,7 @@ function run(args) {
 }
 run(['d1','migrations','apply','DB','--local']);
 const now=Date.now();
-const sql=upcomingOccurrences(now).map(event=>`INSERT INTO events (id,occurrence_key,slug,starts_at,ends_at,timezone,venue_id,capacity,registration_cutoff,created_at)
+const sql=upcomingOccurrences(now, PLANNED_COUNT).map(event=>`INSERT INTO events (id,occurrence_key,slug,starts_at,ends_at,timezone,venue_id,capacity,registration_cutoff,created_at)
   SELECT '${event.occurrenceKey}','${event.occurrenceKey}','${event.occurrenceKey}',${event.startsAt},${event.endsAt},'Europe/Amsterdam',default_venue_id,COALESCE(default_capacity,30),${event.registrationCutoff},${now}
   FROM settings WHERE id=1 AND default_venue_id IS NOT NULL ON CONFLICT(occurrence_key) DO NOTHING;`).join('\n');
 const taskDirectory=mkdtempSync(join(tmpdir(),'tgv-local-'));

@@ -18,7 +18,7 @@ export const siteCopy = {
     dinner: 'Dinner together · until 22:00',
     pending: 'Online registration is coming soon.',
     eveningTitle: 'Help in the kitchen, or just pull up a chair.',
-    eveningIntro: 'Cook with us from 17:00, drop in from 18:00, and sit down together at 19:00. A relaxed Monday around one shared table.',
+    eveningIntro: 'Cook with us from 17:00, drop in from 18:00, and sit down together at 19:00. A\u00A0relaxed Monday around one shared table.',
     cookTitle: 'Cook together from 17:00',
     cookText: 'Three chef places and three helper-chef places. Coordinate the menu and cooking with the organizers after registration.',
     tableTitle: 'One big table. Everyone welcome.',

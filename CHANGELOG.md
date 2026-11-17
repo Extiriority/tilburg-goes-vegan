@@ -1,5 +1,25 @@
 # Changelog
 
+- Closed participant edits and cancellations at dinner start and updated the confirmation email. Private links remain viewable until dinner ends.
+
+- Added permanent participant deletion from the organizer list, including linked database records and protection against stale edits.
+
+- Added branded bilingual local confirmation emails with plain-text and HTML formats and a verified private management link.
+
+- Fixed the local Mailgun queue command so Wrangler startup messages cannot be mistaken for JSON results.
+
+- Added a sandbox sender for one persistent local registration confirmation per run, with atomic claims, bounded retries and no automatic resend after ambiguous delivery.
+
+- Added a local Mailgun confirmation test driven by a synthetic registration in an isolated D1 outbox.
+
+- Added a local PowerShell command to send one dummy email through the Mailgun sandbox with a hidden password prompt.
+
+- Added confirmed announcement deletion and a homepage carousel with manual navigation, pause and reduced-motion support.
+
+- Extended the rolling fortnightly schedule to six planned dates. The homepage shows only the next four; later dates are marked admin-only. Local operations now replenish the schedule.
+
+- Added organizer-managed announcements with editable title/message, a homepage visibility toggle and a public section for the five newest published posts.
+
 - Added optional recipe allergen selection using shared icons/categories, validated storage and possible-allergen chips on public details. Local migration 0018 keeps existing recipes unmarked.
 
 - Added live recipe-photo cropping with zoom and positioning for new or existing images, local 4:3 WebP generation and an explicit apply-before-save flow.

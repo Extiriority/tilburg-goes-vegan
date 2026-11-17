@@ -20,7 +20,7 @@ const signup = (id: string, role = 'guest', status = 'confirmed', email = `${id}
 const count = async () => (await db.prepare("SELECT count(*) AS n FROM registrations WHERE status='confirmed'").first<{n:number}>())!.n;
 
 describe('D1 migrations and integrity', () => {
-  it('uses capacity 30 and generates four dates idempotently without changing cancellations or edits', async () => {
+  it('uses capacity 30 and rolls six planned dates forward without changing cancellations or edits', async () => {
     await db.prepare("DELETE FROM events WHERE id='e'").run();
     expect(await db.prepare('SELECT default_capacity FROM settings WHERE id=1').first()).toEqual({default_capacity:30});
     expect(await db.prepare('SELECT default_venue_id,organizer_email FROM settings WHERE id=1').first()).toEqual({default_venue_id:'tgv-v39',organizer_email:'tilburg@goesvegan.nl'});
@@ -28,12 +28,15 @@ describe('D1 migrations and integrity', () => {
     const now = Date.parse('2026-10-14T12:00:00Z');
     expect(await maintainUpcomingEvents(db,now)).toEqual({configured:false,created:0});
     await db.prepare("UPDATE settings SET default_venue_id='v' WHERE id=1").run();
-    expect(await maintainUpcomingEvents(db,now)).toEqual({configured:true,created:4});
+    expect(await maintainUpcomingEvents(db,now)).toEqual({configured:true,created:6});
     await db.prepare("UPDATE events SET status='cancelled',description='Organizer edit' WHERE occurrence_key='2026-10-26'").run();
     expect(await maintainUpcomingEvents(db,now)).toEqual({configured:true,created:0});
     expect(await db.prepare("SELECT status,description,capacity FROM events WHERE occurrence_key='2026-10-26'").first()).toEqual({status:'cancelled',description:'Organizer edit',capacity:30});
     const results = await Promise.all([maintainUpcomingEvents(db,now),maintainUpcomingEvents(db,now)]);
     expect(results.every((r) => r.created===0)).toBe(true);
+    const after = Date.parse('2026-10-26T21:00:00Z');
+    expect(await maintainUpcomingEvents(db,after)).toEqual({configured:true,created:1});
+    expect(await db.prepare('SELECT count(*) AS n FROM events WHERE ends_at>?').bind(after).first('n')).toBe(6);
   });
   it('creates all 20 specified tables with foreign keys', async () => {
     const tables = await db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all<{name:string}>();

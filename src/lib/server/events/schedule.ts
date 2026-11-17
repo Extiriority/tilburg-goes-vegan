@@ -1,5 +1,6 @@
 export const DEFAULT_CAPACITY = 30;
 export const UPCOMING_COUNT = 4;
+export const PLANNED_COUNT = 6;
 export const TIMEZONE = 'Europe/Amsterdam';
 const DAY = 86_400_000;
 const FIRST_DATE = Date.UTC(2026, 9, 26);
@@ -21,10 +22,10 @@ export function localInstant(calendarDate: number, hour: number): number {
   return instant;
 }
 
-export function upcomingOccurrences(now: number) {
+export function upcomingOccurrences(now: number, count = UPCOMING_COUNT) {
   let date = FIRST_DATE + Math.max(0, Math.floor((now - FIRST_DATE) / (14 * DAY))) * 14 * DAY;
   while (localInstant(date, 22) <= now) date += 14 * DAY;
-  return Array.from({ length: UPCOMING_COUNT }, (_, i) => {
+  return Array.from({ length: count }, (_, i) => {
     const day = date + i * 14 * DAY;
     return {
       occurrenceKey: new Date(day).toISOString().slice(0, 10),

@@ -40,7 +40,7 @@
   });
   let savedToast = $state(false);
   $effect(() => {
-    if (!form?.saved) { savedToast = false; return; }
+    if (!form?.saved && !form?.deleted) { savedToast = false; return; }
     savedToast = true;
     const timer = setTimeout(() => { savedToast = false; }, 3000);
     return () => clearTimeout(timer);
@@ -124,7 +124,7 @@
 </h2>
 <div class="admin-save-announcement" role="status" aria-live="polite" aria-atomic="true">
   {#if savingCost}<p class="admin-save-toast admin-save-toast-pending">{nl ? 'Opslaan…' : 'Saving…'}</p>
-  {:else if savedToast}{#key form}<p class="admin-save-toast">{nl ? 'Opgeslagen.' : 'Saved.'}</p>{/key}{/if}
+  {:else if savedToast}{#key form}<p class="admin-save-toast">{form?.deleted ? (nl ? 'Deelnemer verwijderd.' : 'Participant deleted.') : (nl ? 'Opgeslagen.' : 'Saved.')}</p>{/key}{/if}
 </div>
 {#if form?.message}<p class="form-error" role="alert">{form.message}</p>{/if}
 <div class="admin-gathering-toolbar">
@@ -142,7 +142,7 @@
         {#each data.rows as row}<option value={row.id}
             >{date.format(row.starts_at)} · {row.venue}{row.status === 'cancelled'
               ? ' · ' + labels.cancelled[nl ? 0 : 1]
-              : ''}</option
+              : ''}{data.adminOnlyIds.includes(row.id) ? (nl ? ' · Alleen beheer' : ' · Admin only') : ''}</option
           >{/each}
       </select></label
     ><noscript><button class="button">{nl ? 'Tonen' : 'Show'}</button></noscript>
@@ -459,6 +459,16 @@
                     {person.email_normalized ?? (nl ? 'Gast zonder e-mail' : 'Name-only guest')}
                   </p>
                   {#if person.comments}<p>{person.comments}</p>{/if}{/if}
+                <details class="participant-delete">
+                  <summary>{nl ? 'Deelnemer verwijderen' : 'Delete participant'}</summary>
+                  <form method="POST" action={`?event=${encodeURIComponent(gathering.id)}&/deletePerson`} use:enhance>
+                    <input type="hidden" name="id" value={person.id} />
+                    <input type="hidden" name="eventId" value={gathering.id} />
+                    <input type="hidden" name="version" value={person.version} />
+                    <p class="small">{nl ? 'Verwijdert deze aanmelding en de gekoppelde gegevens definitief.' : 'Permanently removes this registration and its linked records.'}</p>
+                    <button class="button">{nl ? 'Definitief verwijderen' : 'Delete permanently'}</button>
+                  </form>
+                </details>
               </div>{/if}
           </li>{:else}<li class="card">
             {nl ? 'Nog geen bevestigde deelnemers.' : 'No confirmed participants yet.'}

@@ -146,7 +146,10 @@
       </p>
     {/if}
 
-    {#if data.editable && registration.status !== 'cancelled'}
+    {#if data.started && registration.status !== 'cancelled'}
+      <p class="form-notice">{$locale === 'nl' ? 'Het diner is begonnen. Je kunt je aanmelding niet meer wijzigen of annuleren.' : 'Dinner has started. You can no longer update or cancel your registration.'}</p>
+    {/if}
+    {#if data.editable && !data.started && registration.status !== 'cancelled'}
       {#if registration.status === 'undecided' && !data.late && registration.event_status === 'scheduled'}
         <form method="POST" action="?/confirm" use:enhance={enhanceManagement}>
           <input type="hidden" name="version" value={registration.version} />
