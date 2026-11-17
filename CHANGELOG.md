@@ -1,5 +1,9 @@
 # Changelog
 
+- Fixed browser submissions on organizer pages while preserving cross-site form checks and private-link referrer protection.
+
+- Added a fail-closed staging mode for registration and organizer sign-in that verifies the Cloudflare Access assertion. Production remains disabled.
+
 - Closed participant edits and cancellations at dinner start and updated the confirmation email. Private links remain viewable until dinner ends.
 
 - Added permanent participant deletion from the organizer list, including linked database records and protection against stale edits.

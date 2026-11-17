@@ -8,7 +8,7 @@ import { detailsInput } from '$lib/server/registrations/validation';
 import { coordinationInvite, registrationEnabled } from '$lib/server/registrations/config';
 import { confirmedSite } from '$lib/server/site';
 
-export const load:PageServerLoad=async({platform,params,url})=>{
+export const load:PageServerLoad=async({platform,params,url,locals})=>{
   let registration=null;
   try { if(platform?.env.DB) {
     registration=await getManagedRegistration(platform.env.DB,params.token);
@@ -19,13 +19,13 @@ export const load:PageServerLoad=async({platform,params,url})=>{
   } } catch { /* Do not log bearer URLs or participant data. */ }
   return {registration,managementUrl:url.origin+url.pathname,site:confirmedSite,
     invite:coordinationInvite(registration,platform?.env.WHATSAPP_INVITE_URL),
-    editable:registrationEnabled(platform?.env), started:registration ? Date.now()>=registration.starts_at : false,
+    editable:registrationEnabled(platform?.env, locals.stagingAccess), started:registration ? Date.now()>=registration.starts_at : false,
     late:registration?Date.now()>=registration.registration_cutoff:false};
 };
 
 function action(kind:'cancel'|'confirm'|'details'):Actions[string] {
-  return async({request,platform,params})=>{
-    if(!registrationEnabled(platform?.env)) return fail(503,{managementError:'unavailable'});
+  return async({request,platform,params,locals})=>{
+    if(!registrationEnabled(platform?.env, locals.stagingAccess)) return fail(503,{managementError:'unavailable'});
     const form=await request.formData();
     const version=z.string().regex(/^\d+$/).transform(Number).pipe(z.number().int().nonnegative()).safeParse(form.get('version'));
     if(!version.success) return fail(400,{managementError:'conflict'});

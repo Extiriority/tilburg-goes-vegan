@@ -1,9 +1,9 @@
 import type { ManagedRegistration } from './service';
 
-export function registrationEnabled(env: App.Platform['env'] | undefined) {
+export function registrationEnabled(env: App.Platform['env'] | undefined, stagingAccess = false) {
   // Production remains closed until SMTP, retention, rate limits and the reviewed
   // privacy notice are ready. This increment is explicitly local-only.
-  return import.meta.env.DEV && env?.REGISTRATION_ENABLED==='true' && (env.MANAGEMENT_TOKEN_SECRET?.length ?? 0)>=32;
+  return (import.meta.env.DEV || (env?.APP_ENV === 'staging' && stagingAccess)) && env?.REGISTRATION_ENABLED==='true' && (env.MANAGEMENT_TOKEN_SECRET?.length ?? 0)>=32;
 }
 
 export function coordinationInvite(registration: ManagedRegistration | null, invite: string | undefined) {

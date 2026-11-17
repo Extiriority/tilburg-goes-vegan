@@ -58,7 +58,7 @@ export async function resolveAdmin(db: D1Database, token: string | undefined, no
 }
 
 export function requireAdmin(event: RequestEvent) {
-  if (!import.meta.env.DEV || !event.platform?.env.DB) error(404, 'Not found');
+  if (!(import.meta.env.DEV || event.locals.stagingAccess) || !event.platform?.env.DB) error(404, 'Not found');
   if (!event.locals.admin) redirect(303, '/admin/login');
   return { db: event.platform.env.DB, admin: event.locals.admin };
 }

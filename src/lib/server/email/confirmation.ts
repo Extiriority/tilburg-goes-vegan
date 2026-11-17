@@ -4,7 +4,7 @@ const escapeHtml = (value: string) => value.replace(/[&<>"']/g, character =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]!);
 
 export function renderLocalConfirmation(input: {
-  locale: 'en' | 'nl'; fullName: string; startsAt: number; venue: string; address: string; token: string;
+  locale: 'en' | 'nl'; fullName: string; startsAt: number; venue: string; address: string; token: string; stagingOrigin?: string;
 }) {
   const nl = input.locale === 'nl';
   const name = input.fullName.trim().split(/\s+/)[0];
@@ -12,7 +12,7 @@ export function renderLocalConfirmation(input: {
     timeZone: TIMEZONE, dateStyle: 'full', timeStyle: 'short', hourCycle: 'h23',
   }).format(input.startsAt);
   const where = input.venue + ' · ' + input.address;
-  const url = 'http://localhost:5173/registration/manage/' + encodeURIComponent(input.token);
+  const url = (input.stagingOrigin ?? 'http://localhost:5173') + '/registration/manage/' + encodeURIComponent(input.token);
   const subject = nl ? 'Je staat op de lijst! 🌱 Tilburg Goes Vegan (test)' : 'You’re on the list! 🌱 Tilburg Goes Vegan (test)';
   const heading = nl ? 'Je aanmelding is bevestigd!' : 'Your registration is confirmed!';
   const greeting = (nl ? 'Hoi ' : 'Hi ') + name + ',';
@@ -20,7 +20,9 @@ export function renderLocalConfirmation(input: {
   const hint = nl
     ? 'Via je privélink kun je je gegevens aanpassen of annuleren voordat het diner begint. Deel deze link niet.'
     : 'Use your private link to update your details or cancel before dinner starts. Please keep it to yourself.';
-  const local = nl ? 'Sandboxtest: de link werkt alleen op de computer waarop de lokale site draait.' : 'Sandbox test: the link only works on the computer running the local site.';
+  const local = input.stagingOrigin
+    ? (nl ? 'Sandboxtest: meld je aan bij Cloudflare Access om de testsite te openen.' : 'Sandbox test: sign in with Cloudflare Access to open the staging site.')
+    : (nl ? 'Sandboxtest: de link werkt alleen op de computer waarop de lokale site draait.' : 'Sandbox test: the link only works on the computer running the local site.');
   const labels = nl ? ['Wanneer', 'Waar'] : ['When', 'Where'];
   const signOff = nl ? 'Tot aan tafel!' : 'See you at the table!';
   const body = [greeting, heading, labels[0]+': '+when+'\n'+labels[1]+': '+where, button+': '+url, hint, signOff+'\nTilburg Goes Vegan', local].join('\n\n');
