@@ -138,7 +138,8 @@ it('does not let a new signup jump an eligible waiting-list participant',async()
 
 it('does not confirm an existing undecided place before its opening date',async()=>{
   const original=await register(db,secret,await input('legacy@example.invalid','guest',true),now);
-  const starts=Date.parse('2026-11-23T18:00:00Z');
+  // Move the gathering far enough ahead that its opening day is still in the future.
+  const starts = now + 42 * 86400000;
   await db.prepare("UPDATE events SET starts_at=?,ends_at=?,registration_cutoff=? WHERE id='e'").bind(starts,starts+10800000,starts-3*86400000).run();
   await expect(changeRegistration(db,original.token,'confirm',0,undefined,now)).rejects.toMatchObject({code:'not_open'});
   expect(await n('registration_mutations')).toBe(0);
