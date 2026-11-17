@@ -65,3 +65,20 @@ credentials at the prompts. The ignored `.env.staging-mail` file must define
 Keep the staging management signing secret in `.env.staging-secrets` and sign
 in to Wrangler first. The SMTP password is prompted for each run. Check the
 inbox and open the private link while signed in to staging.
+
+The hosted SMTP sender is a separate Worker, `tilburg-goes-vegan-staging-mail`,
+with no public routes. Its ignored `wrangler.staging-mail.local.jsonc` config
+uses the staging D1 binding, `nodejs_compat`, `APP_ENV=staging`, the staging
+origin, the sandbox SMTP username, the two approved recipient addresses, and
+a once-per-minute Cron Trigger. Deploy it with the staging management signing
+key and use Wrangler's interactive secret prompt for the SMTP password:
+
+```powershell
+npx wrangler deploy --config wrangler.staging-mail.local.jsonc --secrets-file .env.staging-secrets --no-autoconfig
+npx wrangler secret put MAILGUN_SMTP_PASSWORD --config wrangler.staging-mail.local.jsonc
+```
+
+The sender checks SMTP authentication before claiming eligible confirmations.
+It shares the manual sender's atomic claim, retry and uncertain-send handling.
+Check the inbox after making a fresh confirmed test registration. To disable
+delivery, delete the sender’s `MAILGUN_SMTP_PASSWORD` secret.

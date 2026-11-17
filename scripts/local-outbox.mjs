@@ -2,9 +2,7 @@ import { getPlatformProxy } from 'wrangler';
 import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { parseEnv } from 'node:util';
-import { claimLocalConfirmation, finishLocalConfirmation } from '../src/lib/server/email/local-outbox.ts';
-import { renderLocalConfirmation } from '../src/lib/server/email/confirmation.ts';
-import { managementToken, hashToken } from '../src/lib/server/registrations/tokens.ts';
+import { claimLocalConfirmation, finishLocalConfirmation, renderClaimedConfirmation } from '../src/lib/server/email/local-outbox.ts';
 
 const args = process.argv.slice(2);
 const staging = args[0] === '--staging';
@@ -72,24 +70,12 @@ try {
     if (typeof secret !== 'string' || secret.length < 32) throw new Error('Management signing key is missing.');
     result = await claimLocalConfirmation(db, value.toLowerCase(), Date.now());
     if (result) {
-      const record = await db.prepare(`SELECT r.id,r.full_name,e.starts_at,v.name AS venue,v.address,t.token_hash
-        FROM email_outbox o JOIN registrations r ON r.id=o.registration_id AND r.event_id=o.event_id
-        JOIN events e ON e.id=r.event_id JOIN venues v ON v.id=e.venue_id
-        JOIN registration_tokens t ON t.registration_id=r.id
-        WHERE o.id=? AND o.status='sending' AND o.attempts=? AND o.purge_at>? AND r.status='confirmed'
-          AND r.email_normalized=o.recipient AND r.anonymized_at IS NULL AND e.status='scheduled'
-          AND e.starts_at>? AND t.revoked_at IS NULL AND t.expires_at>?
-        ORDER BY t.created_at DESC LIMIT 1`)
-        .bind(result.id, result.attempts, Date.now(), Date.now(), Date.now()).first();
-      const token = record && await managementToken(secret, record.id);
-      if (!token || await hashToken(token) !== record.token_hash) {
+      const message = await renderClaimedConfirmation(db, result, secret, Date.now(), stagingOrigin);
+      if (!message) {
         await finishLocalConfirmation(db, result.id, result.attempts, 'permanent', Date.now());
         result = { blocked: true };
       } else {
-        result = { ...result, ...renderLocalConfirmation({
-          locale: result.locale, fullName: record.full_name, startsAt: record.starts_at,
-          venue: record.venue, address: record.address, token, stagingOrigin,
-        }) };
+        result = { ...result, ...message };
       }
     }
   } else {

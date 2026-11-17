@@ -1,5 +1,7 @@
 # Changelog
 
+- Added a scheduled staging Worker for sandbox SMTP confirmations to approved testers.
+
 - Fixed browser submissions on organizer pages while preserving cross-site form checks and private-link referrer protection.
 
 - Added a fail-closed staging mode for registration and organizer sign-in that verifies the Cloudflare Access assertion. Production remains disabled.
