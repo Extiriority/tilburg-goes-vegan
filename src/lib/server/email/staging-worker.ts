@@ -1,4 +1,8 @@
 import nodemailer from 'nodemailer';
+import { connect } from 'cloudflare:sockets';
+import { Duplex } from 'node:stream';
+import type { Socket } from 'node:net';
+import type { SMTPTransportOptions } from 'nodemailer/lib/smtp-transport';
 import {
   claimLocalConfirmation, finishLocalConfirmation, renderClaimedConfirmation, type SendOutcome,
 } from './local-outbox.ts';
@@ -35,15 +39,31 @@ export default {
       .bind(...recipients, now, now).first();
     if (!pending) return;
 
-    const transport = nodemailer.createTransport({
-      host: 'smtp.mailgun.org', port: 587, secure: false, requireTLS: true, auth: { user, pass },
+    const transportOptions: SMTPTransportOptions = {
+      host: 'smtp.mailgun.org', port: 465, secure: true, auth: { user, pass },
       connectionTimeout: 8000, greetingTimeout: 8000, socketTimeout: 10000,
       disableFileAccess: true, disableUrlAccess: true,
-    });
+      getSocket(_options, callback) {
+        const socket = connect({ hostname: 'smtp.mailgun.org', port: 465 }, { secureTransport: 'on', allowHalfOpen: false });
+        const timer = setTimeout(() => void socket.close().catch(() => {}), 20000);
+        void socket.closed.then(() => clearTimeout(timer), () => clearTimeout(timer));
+        void socket.opened.then(() => {
+          const streams = { readable: socket.readable, writable: socket.writable };
+          const stream = Duplex.fromWeb(streams as Parameters<typeof Duplex.fromWeb>[0]);
+          // The underlying Workers socket has a hard deadline instead of Node's idle timeout.
+          const connection = Object.assign(stream, { setTimeout: () => stream }) as unknown as Socket;
+          callback(null, { connection, secured: true });
+        }, () => callback(Object.assign(new Error('Cloudflare SMTP socket could not connect'), { code: 'WORKER_SOCKET' })));
+      },
+    };
+    const transport = nodemailer.createTransport(transportOptions);
     try {
       await transport.verify();
     } catch (error) {
-      console.warn('Staging SMTP preflight failed', smtpOutcome(error));
+      const details = error as { code?: string; command?: string; responseCode?: number } | null;
+      const safeCode = /^[A-Z0-9_]{1,40}$/.test(details?.code ?? '') ? details?.code : undefined;
+      const safeCommand = /^[A-Z ]{1,20}$/.test(details?.command ?? '') ? details?.command : undefined;
+      console.warn('Staging SMTP preflight failed', smtpOutcome(error), safeCode, safeCommand);
       return;
     }
 

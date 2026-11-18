@@ -78,7 +78,8 @@ npx wrangler deploy --config wrangler.staging-mail.local.jsonc --secrets-file .e
 npx wrangler secret put MAILGUN_SMTP_PASSWORD --config wrangler.staging-mail.local.jsonc
 ```
 
-The sender checks SMTP authentication before claiming eligible confirmations.
+The sender uses Cloudflare’s native TLS socket to reach Mailgun on port 465
+and checks SMTP authentication before claiming eligible confirmations.
 It shares the manual sender's atomic claim, retry and uncertain-send handling.
 Check the inbox after making a fresh confirmed test registration. To disable
 delivery, delete the sender’s `MAILGUN_SMTP_PASSWORD` secret.
