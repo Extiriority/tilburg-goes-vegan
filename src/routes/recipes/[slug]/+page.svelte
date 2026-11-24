@@ -13,9 +13,9 @@
   $effect(() => { recipeId; highlightedSteps = []; });
 </script>
 
-<svelte:head><title>{data.recipe.title} — Tilburg Goes Vegan</title></svelte:head>
+
 <main class="page-width section-space recipe-detail">
-  <a href="/recipes">← {nl ? 'Recepten' : 'Recipes'}</a>
+  <a href={`/${$locale}/recipes`}>← {nl ? 'Recepten' : 'Recipes'}</a>
   <div class="recipe-layout" class:has-photos={data.photos.length > 0 || !!data.recipe.youtube_video_id}>
     <header class="recipe-heading">
       <div class="recipe-title-row">

@@ -12,7 +12,8 @@ const fetchAccessKeys: typeof fetch = (input, init) => fetch(input, init);
 
 async function loadAccessKeys(issuer: string, fetchKeys: typeof fetch): Promise<AccessKey[] | undefined> {
   try {
-    const response = await fetchKeys(issuer + '/cdn-cgi/access/certs', { redirect: 'error' });
+    // Workers supports manual redirects, but throws for redirect: 'error'.
+    const response = await fetchKeys(issuer + '/cdn-cgi/access/certs', { redirect: 'manual' });
     if (!response.ok) return;
     const { keys } = await response.json() as { keys?: AccessKey[] };
     if (Array.isArray(keys) && keys.length) return keys;

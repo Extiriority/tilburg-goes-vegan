@@ -1,34 +1,43 @@
 <script lang="ts">
   import { getLocaleStore } from '$lib/locale-context';
+  import Fuse from 'fuse.js';
+  import { untrack } from 'svelte';
+  import SearchHighlight from '$lib/components/SearchHighlight.svelte';
   let { data } = $props();
   const locale = getLocaleStore();
   let nl = $derived($locale === 'nl');
+  let search = $state(untrack(() => data.search));
+  let category = $state(untrack(() => data.category));
+  const filteredRecipes = $derived(data.recipes.filter(recipe => !category || recipe.category === category));
+  const searchIndex = $derived(new Fuse(filteredRecipes, { keys: ['title'], threshold: 0.4, ignoreLocation: true, includeMatches: true }));
+  const visibleRecipes = $derived(search.trim()
+    ? searchIndex.search(search.trim()).map(result => ({ recipe: result.item, ranges: result.matches?.find(match => match.key === 'title')?.indices ?? [] }))
+    : filteredRecipes.map(recipe => ({ recipe, ranges: [] as readonly (readonly [number, number])[] })));
   const courses: Record<string, [string, string]> = {
     starter: ['Voorgerecht', 'Starter'], main: ['Hoofdgerecht', 'Main'], dessert: ['Nagerecht', 'Dessert'],
   };
 </script>
 
-<svelte:head><title>{nl ? 'Recepten' : 'Recipes'} — Tilburg Goes Vegan</title></svelte:head>
+
 <main class="page-width section-space">
-  <a href="/">← Tilburg Goes Vegan</a>
+  <a href={`/${$locale}/`}>← Tilburg Goes Vegan</a>
   <h1 class="section-title" style="margin-top:24px">
     {nl ? 'Uit onze keuken' : 'From our kitchen'}
   </h1>
-  <form method="GET" class="admin-filters form-grid">
-    <label>{nl ? 'Zoeken' : 'Search'}<input name="q" value={data.search} maxlength="200" /></label
-    ><label
-      >{nl ? 'Gang' : 'Category'}<select name="category" value={data.category}
-        ><option value="">{nl ? 'Alle' : 'All'}</option><option value="starter"
-          >{nl ? 'Voorgerecht' : 'Starter'}</option
-        ><option value="main">{nl ? 'Hoofdgerecht' : 'Main'}</option><option value="dessert"
-          >{nl ? 'Nagerecht' : 'Dessert'}</option
-        ></select
-      ></label
-    ><button class="button">{nl ? 'Zoeken' : 'Search'}</button>
+  <form method="GET" class="recipe-filters" onsubmit={event => event.preventDefault()}>
+    <label class="recipe-search"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 5 5" /></svg><input type="search" name="q" bind:value={search} placeholder={nl ? 'Recept zoeken…' : 'Find recipe…'} aria-label={nl ? 'Recept zoeken' : 'Find recipe'} maxlength="200" /></label
+    >
+    <div class="course-filters" role="group" aria-label={nl ? 'Filter op gang' : 'Filter by course'}>
+      {#each ['', 'starter', 'main', 'dessert'] as course}
+        <button type="button" class="course-filter" data-course={course} aria-pressed={category === course} onclick={() => category = course}>
+          {course ? courses[course][nl ? 0 : 1] : nl ? 'Alle' : 'All'}
+        </button>
+      {/each}
+    </div>
   </form>
   <ul class="recipe-card-grid">
-    {#each data.recipes as recipe}<li class="card recipe-list-card">
-        <a class="recipe-image-link" href={`/recipes/${recipe.slug}`} aria-label={recipe.title}>
+    {#each visibleRecipes as { recipe, ranges }}<li class="card recipe-list-card">
+        <a class="recipe-image-link" href={`/${$locale}/recipes/${recipe.slug}`} aria-label={recipe.title}>
         {#if recipe.cover_id}<img
             class="recipe-cover"
             src={`/media/${recipe.cover_id}`}
@@ -42,7 +51,7 @@
         </a>
         <div class="recipe-card-text">
         <div class="recipe-card-heading">
-          <h2><a href={`/recipes/${recipe.slug}`}>{recipe.title}</a></h2>
+          <h2><a href={`/${$locale}/recipes/${recipe.slug}`}><SearchHighlight text={recipe.title} {ranges} /></a></h2>
           <span class="recipe-course-chip" data-course={recipe.category}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               {#if recipe.category === 'starter'}<path d="M3 12h18a9 9 0 0 1-18 0ZM7 3c-2 2 2 3 0 5M12 2c-2 2 2 3 0 5M17 3c-2 2 2 3 0 5M7 21h10"/>
@@ -68,6 +77,19 @@
 </main>
 
 <style>
+  .recipe-filters { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 20px; margin-top: 24px; }
+  .course-filters { display: flex; flex-wrap: wrap; gap: 6px; }
+  .course-filter { min-height: 44px; padding: 8px 16px; border: 1px solid var(--color-line); border-radius: 999px; background: transparent; color: var(--color-forest); font: inherit; font-size: .9rem; cursor: pointer; }
+  .course-filter:hover { background: #e0f2e4; }
+  .course-filter[aria-pressed=true] { background: var(--color-forest); color: white; border-color: var(--color-forest); }
+  .course-filter[data-course=starter][aria-pressed=true] { background: #fff0b3; color: #715200; border-color: #d9c36c; }
+  .course-filter[data-course=main][aria-pressed=true] { background: #e0f2e4; color: #174a2a; border-color: #b7d9bf; }
+  .course-filter[data-course=dessert][aria-pressed=true] { background: #fbe2e9; color: var(--color-raspd); border-color: #e8b4c4; }
+  @media (max-width: 639px) { .recipe-search { flex-basis: 100%; } .course-filters { width: 100%; } .course-filter { flex: 1; padding-inline: 10px; } }
+  .recipe-search { display: flex; align-items: center; gap: 10px; flex: 1 1 220px; min-width: 0; height: 48px; padding-inline: 12px; border: 1px solid var(--color-line); border-radius: 8px; background: var(--color-paper); }
+  .recipe-search:focus-within { outline: 2px solid var(--color-green, #33563a); outline-offset: 2px; }
+  .recipe-search svg { flex-shrink: 0; }
+  .recipe-search input { width: 100%; min-width: 0; height: 100%; border: 0; padding: 0; outline: none; box-shadow: none; background: transparent; }
   .recipe-card-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; list-style: none; padding: 0; margin-top: 32px; }
   .recipe-list-card { overflow: hidden; min-width: 0; border-radius: 16px; }
   .recipe-image-link { display: block; }

@@ -6,39 +6,15 @@
   import HeroDivider from '$lib/components/HeroDivider.svelte';
   import LocationCard from '$lib/components/LocationCard.svelte';
   import RegistrationForm from '$lib/components/RegistrationForm.svelte';
-  import { enhance } from '$app/forms';
-  import type { SubmitFunction } from '@sveltejs/kit';
+  import LanguageLinks from '$lib/components/LanguageLinks.svelte';
+
   import { getLocaleStore } from '$lib/locale-context';
+  import { page } from '$app/state';
 
   let { data, form } = $props();
 
   const localeStore = getLocaleStore();
   let locale = $derived($localeStore);
-  let languagePending = $state(false);
-  let languageError = $state(false);
-
-  const switchLanguage: SubmitFunction = ({ formData, cancel }) => {
-    const next = formData.get('language');
-
-    if ((next !== 'en' && next !== 'nl') || next === locale || languagePending) {
-      cancel();
-      return;
-    }
-
-    const previous = locale;
-    localeStore.set(next);
-    languagePending = true;
-    languageError = false;
-
-    return ({ result }) => {
-      languagePending = false;
-      if (result.type !== 'success') {
-        localeStore.set(previous);
-        languageError = true;
-      }
-      // Only a preference changed: retain event data, scroll and loaded images.
-    };
-  };
 
   let t = $derived(siteCopy[locale]);
   let statuses = $derived(messages[locale].statuses);
@@ -78,21 +54,17 @@
   );
   let first = $derived(data.gatherings[0]);
   let selectedEventId = $state('');
+  $effect(() => {
+    const requested = page.url.searchParams.get('gathering');
+    if (requested && data.gatherings.some(item => item.id === requested && item.canRegister)) selectedEventId = requested;
+  });
   let openingFormat = $derived(new Intl.DateTimeFormat(locale === 'nl' ? 'nl-NL' : 'en-GB', {
     timeZone: 'Europe/Amsterdam', weekday: 'long', day: 'numeric',
   }));
   const gallery = ['linzensoep', 'ramen', 'gazpacho', 'falafelbowl', 'paksoi'] as const;
 </script>
 
-<svelte:head>
-  <title>Tilburg Goes Vegan — {t.headline}</title>
-  <meta name="description" content={t.intro} />
-  <meta property="og:title" content={`Tilburg Goes Vegan — ${t.headline}`} />
-  <meta property="og:description" content={t.intro} />
-  <meta property="og:image" content="/img/og-image.jpg" />
-  <meta property="og:type" content="website" />
-  <meta property="og:locale" content={locale === 'nl' ? 'nl_NL' : 'en_GB'} />
-</svelte:head>
+
 
 <!-- Skip link -->
 <a class="skip-link" href="#main">{t.skip}</a>
@@ -100,7 +72,7 @@
 <!-- Header -->
 <header class="site-header">
   <nav class="page-width nav-row" aria-label={locale === 'nl' ? 'Hoofdnavigatie' : 'Main navigation'}>
-    <a class="brand" href="/" aria-label="Tilburg Goes Vegan">
+    <a class="brand" href={`/${locale}/`} aria-label="Tilburg Goes Vegan">
       <img src="/img/logo.jpg" alt="" width="38" height="38" />
       <span>Tilburg<br class="mobile-break" /> Goes Vegan</span>
     </a>
@@ -111,28 +83,7 @@
       <a href="#recipes">{t.recipes}</a>
     </div>
 
-    <form
-      action="?/language"
-      method="POST"
-      use:enhance={switchLanguage}
-      class="language-switch"
-      aria-busy={languagePending}
-      aria-label={locale === 'nl' ? 'Taal' : 'Language'}
-    >
-      <button name="language" value="nl" aria-label="Nederlands" aria-pressed={locale === 'nl'} disabled={languagePending} lang="nl">
-        NL
-      </button>
-      <span aria-hidden="true">/</span>
-      <button name="language" value="en" aria-label="English" aria-pressed={locale === 'en'} disabled={languagePending} lang="en">
-        EN
-      </button>
-    </form>
-
-    {#if languageError}
-      <p class="language-error" role="alert">
-        {locale === 'nl' ? 'Taalkeuze niet opgeslagen. Probeer opnieuw.' : 'Language preference could not be saved. Please try again.'}
-      </p>
-    {/if}
+    <LanguageLinks />
 
     <a class="button nav-cta" href="#join">{t.join}</a>
   </nav>
@@ -328,7 +279,7 @@
         <p class="eyebrow">{t.recipes}</p>
         <h2 id="recipes-title" class="section-title">{t.recipeTitle}</h2>
         <p class="section-intro">{t.recipeIntro}</p>
-        {#if data.hasRecipes}<a class="button" style="margin-top:24px" href="/recipes">{locale==='nl'?'Bekijk de recepten':'Browse recipes'} ↗</a>{:else}<p class="recipe-notice">{t.recipePending}</p>{/if}
+        {#if data.hasRecipes}<a class="button" style="margin-top:24px" href={`/${locale}/recipes`}>{locale==='nl'?'Bekijk de recepten':'Browse recipes'} ↗</a>{:else}<p class="recipe-notice">{t.recipePending}</p>{/if}
       </div>
       <Photo name="ramen" alt={t.photoAlts.ramen} />
     </div>
@@ -369,7 +320,7 @@
 <footer class="site-footer">
   <div class="page-width footer-grid">
     <div>
-      <a class="brand" href="/">
+      <a class="brand" href={`/${locale}/`}>
         <img src="/img/logo.jpg" alt="" width="40" height="40" />
         <span>Tilburg<br />Goes Vegan</span>
       </a>
@@ -381,7 +332,7 @@
       <a href={`mailto:${data.site.email}`}>{data.site.email}</a>
       <a href={data.site.instagramUrl} target="_blank" rel="noopener noreferrer">Instagram ↗</a>
       <a href={data.site.facebookUrl} target="_blank" rel="noopener noreferrer">Facebook ↗</a>
-      <a href="/privacy">{t.privacy}</a>
+      <a href={`/${locale}/privacy`}>{t.privacy}</a>
     </div>
 
     <div>
@@ -396,7 +347,7 @@
 <div class="mobile-action">
   <div>
     <strong>{dateFormat.format(first.startsAt)}</strong>
-    <span>€7 · {t.pending}</span>
+    <span>€7 · {data.registrationReady ? t.dateDetail : t.pending}</span>
   </div>
   <a class="button" href="#join">{t.join}</a>
 </div>

@@ -23,3 +23,5 @@ Confirmed venue/contact defaults are installed by migration without overwriting 
 No deployment or publication. The designer's source files remain untouched.
 
 Validation: Svelte/TypeScript reports zero errors/warnings; all twelve automated tests pass, including confirmed defaults and generation invariants; the new migration applies locally. Browser QA checked desktop and 390px mobile layouts, no horizontal overflow, loaded photos, disabled form controls, the first-two/later-two date styling and language persistence after reload. A clean local copy builds with the Cloudflare adapter; building into the existing `.svelte-kit/cloudflare` output remains blocked by the running development server's Windows directory lock.
+
+Error-page image: static/img/lost-carrots.webp is a real photograph by Wayne Pulford, downloaded 24 November 2026 from https://unsplash.com/photos/a-group-of-carrots-in-the-grass-2wCdYVHTVN8 under the Unsplash License (https://unsplash.com/license). Served locally with a photographer credit.

@@ -5,7 +5,7 @@
   import { readRecipeAllergens } from '$lib/recipe-content';
   import { recipeSlug, readRecipeNotes, type RecipeNote } from '$lib/recipe-content';
   let { recipe, initialIngredients, initialSteps, nl }: {
-    recipe: { id: string; version: number; title: string; description: string | null; category: string; chef_credit: string | null; notes: string; youtube_video_id: string | null; serving_grams: number | null; calories_kcal: number | null; servings: number | null; total_minutes: number | null; allergens: string } | null;
+    recipe: { id: string; version: number; title: string; description: string | null; meta_description?: string | null; category: string; chef_credit: string | null; notes: string; youtube_video_id: string | null; serving_grams: number | null; calories_kcal: number | null; servings: number | null; total_minutes: number | null; allergens: string } | null;
     initialIngredients: { quantity: string; name: string }[]; initialSteps: string[]; nl: boolean;
   } = $props();
   let title = $state(untrack(() => recipe?.title ?? ''));
@@ -51,6 +51,7 @@
   <label>{nl ? 'Gang' : 'Category'}<select name="category" value={recipe?.category ?? 'main'}><option value="starter">{nl ? 'Voorgerecht' : 'Starter'}</option><option value="main">{nl ? 'Hoofdgerecht' : 'Main'}</option><option value="dessert">{nl ? 'Nagerecht' : 'Dessert'}</option></select></label>
   <label>{nl ? 'Kok (optioneel)' : 'Chef credit (optional)'}<input name="chefCredit" value={recipe?.chef_credit ?? ''} maxlength="160" /></label>
   <label class="full">{nl ? 'Beschrijving' : 'Description'}<textarea name="description" rows="2" maxlength="4000" value={recipe?.description ?? ''}></textarea></label>
+  <label class="full">{nl ? 'SEO-beschrijving (optioneel)' : 'SEO description (optional)'}<textarea name="metaDescription" rows="2" maxlength="320" value={recipe?.meta_description ?? ''}></textarea><span class="small muted">{nl ? 'Korte samenvatting voor zoekresultaten en gedeelde links. Richtlijn: ongeveer 150 tekens.' : 'Short summary for search results and shared links. Aim for around 150 characters.'}</span></label>
 
   <fieldset class="full recipe-repeat"><legend>{nl ? 'Ingrediënten' : 'Ingredients'}</legend>
     {#each ingredients as item, i}<div class="recipe-ingredient-row">

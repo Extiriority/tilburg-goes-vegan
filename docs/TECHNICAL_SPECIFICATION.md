@@ -170,3 +170,17 @@ Organizer role amendment: quick-add supports Guest, Helper chef and Chef from Wh
 Status amendment: Confirmed indicates a retained booking, not attendance. No-show is available from 00:00 Europe/Amsterdam on the gathering date (through identity retention), rather than dinner start. No-show rows show unpaid contribution remaining (whole party, chef lead free, subtract recorded payments) instead of Paid controls. Cancelled rows hide financial controls without deleting stored money. Existing undecided bookings remain visible before Saturday cutoff, but organizers cannot newly choose Undecided; remaining undecided bookings are cancelled at cutoff with idempotent queued notifications. New waiting-list selections require full gathering capacity; existing waiting-list records remain identifiable and promotion rules are unchanged. The main list contains confirmed/existing undecided records; waiting-list, no-show and cancelled entries have separate groups below.
 
 Budget correction: estimated course budgets use max(0, confirmed people - 3) times EUR 2/3/2 (starter/main/dessert), total max(0,n-3)*7. This supersedes the earlier all-people-without-deduction estimate. The deduction is a fixed three places per the supplied table; recorded payments and actual-cost balance remain independent.
+
+Payment preview amendment: the organizer gathering participant-count chip opens a centered bilingual dialog with a dummy QR illustration. This preview has no payment destination or payment processing. Real online payments require a separate product decision.
+
+The organizer budget copy includes the gathering's reported allergen names and aggregated dietary details when present, in the selected interface language.
+
+Announcement ordering amendment: organizers edit a display-order number alongside title and message. Lower numbers appear first in the homepage carousel and organizer list; equal positions retain newest-publication ordering.
+
+Recipe navigation includes client-side fuzzy title search over the loaded organizer list (up to 100 recipes), with a compact search field and add button. Matching recipe title letters are highlighted. Announcements show the add form directly, with a new-announcement link when editing.
+
+Public recipe search uses the same fuzzy title matching and highlight component as organizer recipes. It updates while typing and combines with course filtering over the 100 most recent loaded recipes.
+
+Announcement carousel controls sit below the card. Cycling pauses while hovered or keyboard-focused, while the explicit play/pause control and reduced-motion preference remain supported.
+
+SEO amendment (24 November 2026): the confirmed public origin is https://www.tilburggoesvegan.nl. Public Dutch and English pages use /nl/ and /en/, with URL-authoritative language, canonical/hreflang, social metadata, Organization/Recipe/Event JSON-LD, public gathering detail pages, sitemap and robots routes. Organizers edit page descriptions per language in Overview and recipe descriptions in the recipe editor. Non-production remains noindex. See SEO.md.

@@ -27,7 +27,7 @@ it('accepts only a signed assertion for the configured staging origin and audien
   expect(await verifyStagingAccess(request, settings, keys, 100000)).toBe(true);
   const forged = new Request(settings.STAGING_ORIGIN, { headers: { 'Cf-Access-Jwt-Assertion': [head, payload, 'AAA'].join('.') } });
   expect(await verifyStagingAccess(forged, settings, keys, 100000)).toBe(false);
-  expect(keys).toHaveBeenCalledWith(settings.ACCESS_ISSUER + '/cdn-cgi/access/certs', { redirect: 'error' });
+  expect(keys).toHaveBeenCalledWith(settings.ACCESS_ISSUER + '/cdn-cgi/access/certs', { redirect: 'manual' });
 });
 
 it('uses only a current key snapshot for the configured issuer when key fetching fails', async () => {

@@ -62,3 +62,7 @@ Migration 0011_short_whiplash adds gathering_dietary: one event-keyed notes valu
 Migration 0012_damp_frog_thor adds walk_in_guests.source (WhatsApp/unannounced for new quick adds; legacy rows retain other). Existing override columns remain compatible: quick-add accommodation stores a system-generated source reason, never asks for participant/private text. Source is deleted with the walk-in at +7 days.
 
 Migration 0013_naive_vapor adds role (legacy default guest), chef_cost_cents, chef_reimbursed_cents and chef_cost_recorded_at to walk_in_guests. Rebuilt confirmed_participants exposes stored organizer roles. Added role/expense validity and combined volunteer-slot trigger guards. Preserve these custom SQL definitions in later migrations.
+
+Migration 0020 adds announcements.sort_order (non-null integer, default 0), preserving the publication order of existing announcements.
+
+Migration 0021 adds seo_metadata (page+locale primary key and editable description) and nullable recipes.meta_description. Existing recipes fall back to their description.

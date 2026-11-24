@@ -41,3 +41,5 @@ Quick-add organizer increment complete: compact name/group/source fields, automa
 Local organizer role increment complete: shared volunteer slots, organizer chef expense bookkeeping and compact name/group/role/source layout. Local migration 0013 applied; 92 tests pass and type checks are clean. No deployment.
 
 Implemented status/deadline refinements with exact gathering-day midnight and cutoff tests, notification atomicity/idempotency, grouped lists and revised payment displays. Local operations sweep and authenticated admin/private-page catch-up handle undecided expiry. 96 tests pass. Production scheduling and email delivery remain pending; no deployment.
+
+SEO increment implemented locally: language URLs, structured data, sitemap/robots, social metadata and editable descriptions. Launch validation requires the confirmed domain, production headers, Google rich-result/social-preview checks and Search Console ownership. See SEO.md.

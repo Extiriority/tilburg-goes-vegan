@@ -1,5 +1,8 @@
 <script lang="ts">
   import RecipeEditor from '$lib/components/RecipeEditor.svelte';
+  import Fuse from 'fuse.js';
+  import SearchHighlight from '$lib/components/SearchHighlight.svelte';
+  import { untrack } from 'svelte';
   import { getLocaleStore } from '$lib/locale-context';
   import { page } from '$app/state';
   import RecipePhotoUpload from '$lib/components/RecipePhotoUpload.svelte';
@@ -7,28 +10,30 @@
   const locale = getLocaleStore();
   let nl = $derived($locale === 'nl');
   let photoBusy = $state(false);
+  let search = $state(untrack(() => data.search));
+  const searchIndex = $derived(new Fuse(data.rows, { keys: ['title'], threshold: 0.4, ignoreLocation: true, includeMatches: true }));
+  const visibleRecipes = $derived(search.trim()
+    ? searchIndex.search(search.trim()).map(result => ({ recipe: result.item, ranges: result.matches?.find(match => match.key === 'title')?.indices ?? [] }))
+    : data.rows.map(recipe => ({ recipe, ranges: [] as readonly (readonly [number, number])[] })));
 </script>
 
 <h2>{nl ? 'Recepten' : 'Recipes'}</h2>
-<form method="GET" class="admin-filters form-grid">
-  <label
-    >{nl ? 'Recept zoeken' : 'Find recipe'}<input
-      name="q"
-      value={data.search}
-      maxlength="200"
-    /></label
-  ><button class="button">{nl ? 'Zoeken' : 'Search'}</button>
-</form>
 <div class="admin-recipe-grid">
   <aside>
-    <a class="button" href="/admin/recipes">{nl ? 'Nieuw recept' : 'New recipe'}</a>
+    <div class="recipe-toolbar">
+      <label class="recipe-search">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 5 5" /></svg>
+        <input type="search" bind:value={search} maxlength="200" placeholder={nl ? 'Recept zoeken…' : 'Find recipe…'} aria-label={nl ? 'Recept zoeken' : 'Find recipe'} />
+      </label>
+      <a class="button recipe-add" href="/admin/recipes" aria-label={nl ? 'Nieuw recept' : 'New recipe'} title={nl ? 'Nieuw recept' : 'New recipe'}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg></a>
+    </div>
     <ul class="admin-recipe-list">
-      {#each data.rows as recipe}<li>
+      {#each visibleRecipes as { recipe, ranges }}<li>
           <a
             href={`/admin/recipes?edit=${recipe.id}`}
-            aria-current={data.selected?.id === recipe.id ? 'page' : undefined}>{recipe.title}</a
+            aria-current={data.selected?.id === recipe.id ? 'page' : undefined}><SearchHighlight text={recipe.title} {ranges} /></a
           >
-        </li>{:else}<li>{nl ? 'Nog geen recepten.' : 'No recipes yet.'}</li>{/each}
+        </li>{:else}<li role="status">{search.trim() ? (nl ? 'Geen recepten gevonden.' : 'No matching recipes.') : (nl ? 'Nog geen recepten.' : 'No recipes yet.')}</li>{/each}
     </ul>
   </aside>
   <section class="card admin-editor">
@@ -46,7 +51,7 @@
       </p>{/if}{#if form?.message}<p class="form-error" role="alert">{form.message}</p>{/if}
     {#key data.selected?.id}
       <RecipeEditor recipe={data.selected} initialIngredients={data.ingredients} initialSteps={data.steps} {nl} />
-      {#if data.selected}<a href={`/recipes/${data.selected.slug}`}>{nl ? 'Recept bekijken' : 'View recipe'} ↗</a>{/if}
+      {#if data.selected}<a href={`/${$locale}/recipes/${data.selected.slug}`}>{nl ? 'Recept bekijken' : 'View recipe'} ↗</a>{/if}
       {/key}
     {#if data.selected}
       <h3 style="margin-top:32px">{nl ? 'Foto (optioneel)' : 'Photo (optional)'}</h3>
@@ -94,3 +99,12 @@
     {/if}
   </section>
 </div>
+
+<style>
+  .recipe-toolbar { display: flex; align-items: center; gap: 8px; }
+  .recipe-search { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; height: 44px; padding-inline: 12px; border: 1px solid var(--color-line); border-radius: 8px; background: var(--color-paper); }
+  .recipe-search:focus-within { outline: 2px solid var(--color-green, #33563a); outline-offset: 2px; }
+  .recipe-search svg { flex-shrink: 0; }
+  .recipe-search input { width: 100%; min-width: 0; height: 100%; padding: 0; border: 0; background: transparent; box-shadow: none; outline: none; }
+  .recipe-add { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 44px; width: 44px; height: 44px; min-height: 44px; padding: 0; border-radius: 8px; }
+</style>

@@ -18,11 +18,11 @@ export const load = async ({ platform, locals }: Parameters<PageServerLoad>[0]) 
   const registration={registrationReady:ready,submissionToken:ready?await createSubmissionToken(platform!.env.MANAGEMENT_TOKEN_SECRET!):'',hasRecipes:false,announcements:[] as Awaited<ReturnType<typeof publishedAnnouncements>>};
   if (!platform?.env.DB) return { ...registration,site: confirmedSite, gatherings: occurrences.map((event) => ({ ...event, id:'', canRegister:false, registrationOpensAt:registrationOpensAt(event.startsAt), venue: confirmedSite.venue, address: confirmedSite.address, mapsUrl: confirmedSite.mapsUrl, availability: 'setup_pending' })) };
   const rows = await platform.env.DB.prepare(`
-    SELECT e.id,e.occurrence_key,e.starts_at,e.ends_at,e.registration_cutoff,e.capacity,e.status,v.name AS venue,v.address,
+    SELECT e.id,e.slug,e.occurrence_key,e.starts_at,e.ends_at,e.registration_cutoff,e.capacity,e.status,v.name AS venue,v.address,
       (SELECT COALESCE(sum(seats),0) FROM confirmed_participants r WHERE r.event_id=e.id) AS confirmed
     FROM events e JOIN venues v ON v.id=e.venue_id WHERE e.ends_at>? ORDER BY e.starts_at,e.id LIMIT ?
   `).bind(now, UPCOMING_COUNT).all<{
-    id:string; occurrence_key: string; starts_at: number; ends_at: number; registration_cutoff: number;
+    id:string; slug: string; occurrence_key: string; starts_at: number; ends_at: number; registration_cutoff: number;
     capacity: number; status: string; confirmed: number; venue: string; address: string;
   }>();
   const [recipe, announcements] = await Promise.all([
@@ -34,7 +34,7 @@ export const load = async ({ platform, locals }: Parameters<PageServerLoad>[0]) 
     const window=await registrationWindow(platform.env.DB,row.id);
     const opensAt=window?.opensAt??registrationOpensAt(row.starts_at);
     return {
-      occurrenceKey: row.occurrence_key, startsAt: row.starts_at, endsAt: row.ends_at,
+      occurrenceKey: row.occurrence_key, slug: row.slug, startsAt: row.starts_at, endsAt: row.ends_at,
       registrationOpensAt:opensAt, id:row.id, canRegister:now>=opensAt && ready && row.status==='scheduled' && now<row.registration_cutoff,
       registrationCutoff: row.registration_cutoff,
       venue: row.venue, address: row.address, mapsUrl: row.address === confirmedSite.address ? confirmedSite.mapsUrl : `https://www.openstreetmap.org/search?query=${encodeURIComponent(row.address)}`,
@@ -62,6 +62,6 @@ export const actions: Actions = {
     if (!language.success) return fail(400);
     cookies.set('language', language.data, { path: '/', httpOnly: true, sameSite: 'lax', secure: url.protocol === 'https:', maxAge: 365 * 24 * 60 * 60 });
     if (request.headers.get('x-sveltekit-action') === 'true') return { language: language.data };
-    redirect(303, '/');
+    redirect(303, `/${language.data}/`);
   }
 };
