@@ -29,3 +29,5 @@ Resolved: additional organizer-entered dietary reports supplement website report
 Resolved: Add person defaults to WhatsApp with an Unannounced alternative. The quick-add flow no longer asks for override reasons or an extra acknowledgement. Organizer addition accommodates the whole party atomically; existing waiting-list priority remains unchanged.
 
 Resolved status refinements: no-show from gathering-day midnight; no new organizer undecided selections; auto-cancel undecided at Saturday 16:00; only offer new waiting-list status at full capacity. Existing capacity/contact/meal rules still govern restoring Confirmed.
+
+Resolved 24 November 2026: public hostname www.tilburggoesvegan.nl, public language prefixes /nl/ and /en/. Domain delegation, production activation and Search Console ownership remain launch steps.

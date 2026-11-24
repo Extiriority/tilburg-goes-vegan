@@ -7,8 +7,7 @@ export const load = async (event: import('./$types').PageServerLoadEvent) => {
   const { db } = requireAdmin(event);
   const search = (event.url.searchParams.get('q') ?? '').slice(0, 200);
   const rows = await db
-    .prepare('SELECT * FROM recipes WHERE title LIKE ? ORDER BY published_at DESC LIMIT 100')
-    .bind(`%${search}%`)
+    .prepare('SELECT * FROM recipes ORDER BY published_at DESC LIMIT 100')
     .all<{
       id: string;
       slug: string;
@@ -25,6 +24,7 @@ export const load = async (event: import('./$types').PageServerLoadEvent) => {
         slug: string;
         title: string;
         description: string | null;
+        meta_description: string | null;
         category: string;
         chef_credit: string | null;
         version: number; notes: string; youtube_video_id: string | null; serving_grams: number | null; calories_kcal: number | null; servings: number | null; total_minutes: number | null; allergens: string;

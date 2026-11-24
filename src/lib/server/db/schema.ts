@@ -11,10 +11,17 @@ import {
 const id = () => text('id').primaryKey();
 const created = () => integer('created_at').notNull(); // UTC epoch milliseconds everywhere.
 
+export const seoMetadata = sqliteTable('seo_metadata', {
+  page: text('page').notNull(),
+  locale: text('locale').notNull(),
+  description: text('description').notNull().default(''),
+}, (t) => [primaryKey({ columns: [t.page, t.locale] })]);
+
 export const announcements = sqliteTable('announcements', {
   id: id(),
   title: text('title').notNull(),
   body: text('body').notNull(),
+  sortOrder: integer('sort_order').notNull().default(0),
   publishedAt: integer('published_at'),
   updatedAt: integer('updated_at').notNull(),
   version: integer('version').notNull().default(0),
@@ -221,6 +228,7 @@ export const recipes = sqliteTable(
     slug: text('slug').notNull().unique(),
     title: text('title').notNull(),
     description: text('description'),
+    metaDescription: text('meta_description'),
     category: text('category', {
       enum: ['starter', 'main', 'dessert'],
     }).notNull(),

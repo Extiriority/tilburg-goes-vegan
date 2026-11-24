@@ -10,11 +10,11 @@
 <h2>{nl ? 'Mededelingen' : 'Announcements'}</h2>
 <div class="admin-recipe-grid announcement-admin">
   <aside>
-    <a class="button" href="/admin/announcements">{nl ? 'Nieuwe mededeling' : 'New announcement'}</a>
+    {#if data.selected}<a href="/admin/announcements">{nl ? 'Nieuwe mededeling' : 'New announcement'}</a>{/if}
     <ul class="admin-recipe-list">
       {#each data.rows as row (row.id)}
         <li><a href={`/admin/announcements?edit=${row.id}`} aria-current={data.selected?.id === row.id ? 'page' : undefined}>
-          {row.title} <span class="small muted">· {row.published_at !== null ? (nl ? 'Gepubliceerd' : 'Published') : (nl ? 'Verborgen' : 'Hidden')}</span>
+          {row.title} <span class="small muted">· {nl ? 'Volgorde' : 'Order'} {row.sort_order} · {row.published_at !== null ? (nl ? 'Gepubliceerd' : 'Published') : (nl ? 'Verborgen' : 'Hidden')}</span>
         </a></li>
       {:else}<li>{nl ? 'Nog geen mededelingen.' : 'No announcements yet.'}</li>{/each}
     </ul>
@@ -33,6 +33,7 @@
         <input type="hidden" name="version" value={data.selected?.version ?? 0} />
         <label class="full">{nl ? 'Titel' : 'Title'}<input name="title" required maxlength="120" value={data.selected?.title ?? ''} /></label>
         <label class="full">{nl ? 'Bericht' : 'Message'}<textarea name="body" required maxlength="3000" rows="6" value={data.selected?.body ?? ''}></textarea></label>
+        <label class="full">{nl ? 'Volgorde' : 'Display order'}<input name="sortOrder" type="number" min="0" max="9999" step="1" required value={data.selected?.sort_order ?? 0} /><span class="small muted">{nl ? 'Lagere nummers worden eerst getoond.' : 'Lower numbers appear first.'}</span></label>
         <label class="consent full"><input type="checkbox" name="published" checked={!data.selected || data.selected.published_at !== null} /><span>{nl ? 'Tonen op de homepage' : 'Show on the homepage'}</span></label>
         <button class="button" disabled={saving}>{saving ? (nl ? 'Opslaan…' : 'Saving…') : (nl ? 'Mededeling opslaan' : 'Save announcement')}</button>
       </form>
@@ -53,6 +54,7 @@
 
 <style>
   .announcement-admin { margin-top: 20px; }
+  .announcement-admin :global(.admin-recipe-list a) { padding-block: 10px; }
   .announcement-delete { margin-top: 24px; }
   .announcement-delete summary { cursor: pointer; color: var(--color-raspd); }
   .announcement-delete form { margin-top: 12px; }

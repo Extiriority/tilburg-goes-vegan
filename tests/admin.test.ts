@@ -33,6 +33,8 @@ import { promoteWaitingList } from '../src/lib/server/events/waiting-list';
 import { actions as registrationActions } from '../src/routes/admin/(panel)/registrations/+page.server';
 import { actions as eventActions } from '../src/routes/admin/(panel)/events/+page.server';
 import { actions as recipeActions } from '../src/routes/admin/(panel)/recipes/+page.server';
+import { actions as overviewActions } from '../src/routes/admin/(panel)/+page.server';
+import { seoDescriptions } from '../src/lib/server/seo';
 const starts = Date.parse('2026-10-26T18:00:00Z'),
   cutoff = Date.parse('2026-10-24T14:00:00Z');
 let mf: Miniflare, db: D1Database, bucket: R2Bucket, clock: number, timed: D1Database;
@@ -267,10 +269,11 @@ it('requires Monday contact acknowledgement, FIFO and a promotion before 19:00',
 });
 
 it('publishes recipes with ordered ingredients/steps and rolls back stale updates', async () => {
-  const input = recipeInput(),
+  const input = { ...recipeInput(), metaDescription: 'A short researched recipe summary.' },
     id = await saveRecipe(db, 'admin', input, clock);
   expect(await count('recipes')).toBe(1);
   expect(await count('dishes')).toBe(1);
+  expect(await db.prepare('SELECT meta_description FROM recipes WHERE id=?').bind(id).first('meta_description')).toBe(input.metaDescription);
   expect(
     (
       await db
@@ -279,11 +282,27 @@ it('publishes recipes with ordered ingredients/steps and rolls back stale update
         .all()
     ).results,
   ).toEqual([{ ingredient: 'lentils' }, { ingredient: 'water' }]);
-  await saveRecipe(db, 'admin', { ...input, id, title: 'Updated synthetic' }, clock);
+  await saveRecipe(db, 'admin', { ...input, id, title: 'Updated synthetic', metaDescription: 'Updated summary.' }, clock);
+  expect(await db.prepare('SELECT meta_description FROM recipes WHERE id=?').bind(id).first('meta_description')).toBe('Updated summary.');
   await expect(saveRecipe(db, 'admin', { ...input, id, title: 'Stale' }, clock)).rejects.toThrow();
   expect((await db.prepare('SELECT title FROM recipes WHERE id=?').bind(id).first())!.title).toBe(
     'Updated synthetic',
   );
+});
+
+it('saves page SEO descriptions by language without overwriting other pages', async () => {
+  const makeEvent = (fields: Record<string, string>, admin = true) => ({
+    platform: { env: { DB: db } }, locals: { admin: admin ? { id: 'admin' } : null },
+    request: new Request('http://localhost/admin?/seo', { method: 'POST', body: new URLSearchParams(fields) }),
+  }) as never;
+  const input = { page: 'home', locale: 'nl', description: 'Samen eten in Tilburg.' };
+  await expect(overviewActions.seo(makeEvent(input, false))).rejects.toMatchObject({ status: 303 });
+  expect(await overviewActions.seo(makeEvent(input))).toEqual({ seoSaved: true });
+  const descriptions = await seoDescriptions(db);
+  expect(descriptions.home.nl).toBe(input.description);
+  expect(descriptions.home.en).not.toBe(input.description);
+  expect(descriptions.recipes.nl).not.toBe(input.description);
+  expect(await overviewActions.seo(makeEvent({ ...input, description: 'x'.repeat(321) }))).toMatchObject({ status: 400 });
 });
 
 it('stores linked recipe notes, optional nutrition and a validated tutorial with automatic slugs', async () => {
@@ -1058,4 +1077,15 @@ it('publishes only visible announcements and rejects stale edits', async () => {
   expect(await deleteAnnouncement(db, id, 1)).toBe(false);
   expect(await deleteAnnouncement(db, id, 2)).toBe(true);
   expect(await deleteAnnouncement(db, id, 2)).toBe(false);
+});
+
+it('orders published announcements by editable position and preserves stale-write protection', async () => {
+  const input = announcementInput.parse({ id: '', version: '0', title: 'First', body: 'Message', published: true, sortOrder: '1' });
+  const first = (await saveAnnouncement(db, input, clock))!;
+  const second = (await saveAnnouncement(db, { ...input, title: 'Second', sortOrder: 2 }, clock + 1))!;
+  expect((await publishedAnnouncements(db)).map(row => row.id)).toEqual([first, second]);
+  expect(await saveAnnouncement(db, { ...input, id: second, title: 'Second', sortOrder: 0 }, clock + 2)).toBe(second);
+  expect((await publishedAnnouncements(db)).map(row => row.id)).toEqual([second, first]);
+  expect(await saveAnnouncement(db, { ...input, id: second, sortOrder: 3 }, clock + 3)).toBeNull();
+  expect(announcementInput.safeParse({ ...input, version: '0', sortOrder: '-1' }).success).toBe(false);
 });

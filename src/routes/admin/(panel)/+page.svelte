@@ -1,6 +1,8 @@
 <script lang="ts">
   import { getLocaleStore } from '$lib/locale-context';
-  let { data } = $props();
+  import { enhance } from '$app/forms';
+  import { seoPages } from '$lib/seo';
+  let { data, form } = $props();
   const locale = getLocaleStore();
   let nl = $derived($locale === 'nl');
 </script>
@@ -36,6 +38,21 @@
     ><strong>{data.recipes}</strong><span>{nl ? 'Recepten' : 'Recipes'}</span></a
   >
 </div>
+<details class="card" style="margin-top:24px;padding:24px">
+  <summary>{nl ? 'SEO-beschrijvingen' : 'SEO descriptions'}</summary>
+  <p>{nl ? 'Korte samenvattingen voor zoekresultaten en gedeelde links. Richtlijn: ongeveer 150 tekens. Recepten hebben een eigen veld in de recepteditor.' : 'Short summaries for search results and shared links. Aim for around 150 characters. Recipes have their own field in the recipe editor.'}</p>
+  {#if form?.seoSaved}<p role="status">{nl ? 'Opgeslagen.' : 'Saved.'}</p>{/if}
+  {#if form?.seoError}<p role="alert">{nl ? 'Controleer de invoer (maximaal 320 tekens).' : 'Check the description (320 characters maximum).'}</p>{/if}
+  {#each seoPages as seoPage}
+    {#each ['nl', 'en'] as language}
+      <form method="POST" action="?/seo" use:enhance class="form-grid" style="margin-top:20px">
+        <input type="hidden" name="page" value={seoPage} /><input type="hidden" name="locale" value={language} />
+        <label class="full">{seoPage === 'home' ? 'Homepage' : seoPage === 'recipes' ? (nl ? 'Recepten' : 'Recipes') : 'Privacy'} · {language.toUpperCase()}<textarea name="description" maxlength="320" rows="2" value={data.seoDescriptions[seoPage][language as 'nl' | 'en']}></textarea></label>
+        <button class="button">{nl ? 'Opslaan' : 'Save'}</button>
+      </form>
+    {/each}
+  {/each}
+</details>
 <p class="form-notice">
   {nl
     ? 'Lokale beheerversie. E-mails worden klaargezet, nog niet verstuurd.'

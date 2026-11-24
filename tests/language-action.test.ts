@@ -20,7 +20,7 @@ it('saves an enhanced language preference without redirecting or reading events'
 
 it('keeps the native POST/redirect fallback and supports local HTTP', async () => {
   const {cookie,input} = event('en',false,false);
-  await expect(actions.language(input)).rejects.toMatchObject({status:303,location:'/'});
+  await expect(actions.language(input)).rejects.toMatchObject({status:303,location:'/en/'});
   expect(cookie).toHaveBeenCalledWith('language','en',expect.objectContaining({secure:false}));
 });
 

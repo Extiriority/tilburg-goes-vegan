@@ -1,5 +1,19 @@
 # Changelog
 
+- Added a playful bilingual error page with a licensed, locally hosted photograph of carrots by Wayne Pulford.
+
+- Removed gathering detail links from homepage cards while keeping the public pages and production sitemap entries.
+
+- Added language-specific public URLs, editable SEO descriptions, canonical/hreflang and social metadata, robots/sitemap routes, structured Organization/Recipe/Event data and public gathering details. See docs/SEO.md. Migration 0021 applied locally.
+
+- Added editable announcement display order for the homepage carousel and organizer list.
+
+- Included reported gathering allergens and dietary details when copying the course budget for WhatsApp.
+
+- Made the organizer gathering budget chip open a bilingual dummy payment QR preview.
+
+- Fixed staging Access key retrieval using the redirect mode supported by Cloudflare Workers, removing the deployment's expiring key snapshot dependency.
+
 - Added a scheduled staging Worker for sandbox SMTP confirmations to approved testers.
 
 - Fixed browser submissions on organizer pages while preserving cross-site form checks and private-link referrer protection.
@@ -285,3 +299,17 @@
 - Enabled no-show from gathering-day midnight, added unpaid Missing amounts and hid cancelled financial controls. Grouped waiting/no-show/cancelled rows below the main list. Restricted new undecided/waiting choices and added atomic cutoff expiry of undecided bookings with deduplicated queued notifications. 96 tests and browser/type checks pass; no deployment.
 
 - Replaced locale-dependent gathering datetime controls with explicit 24-hour time entry for editing and creation. Preserved Amsterdam scheduling; focused tests, type checks and mobile browser validation pass.
+
+- Moved the dummy QR preview to the participant count and added budget copying for WhatsApp with bilingual feedback.
+
+- Compacted announcement navigation with a search field, add icon and fuzzy title matching.
+
+- Moved compact fuzzy search to the recipe organizer panel and retained the announcement add icon.
+
+- Highlighted fuzzy recipe title matches and removed the redundant add-announcement button.
+
+- Added instant fuzzy title search and highlighted matches to public recipes, with live course filtering.
+
+- Replaced the public recipe category dropdown with responsive course filter chips.
+
+- Moved announcement controls below the card with subtle icons and paused cycling during hover or keyboard focus.

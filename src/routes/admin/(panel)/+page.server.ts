@@ -1,5 +1,7 @@
 import { requireAdmin } from '$lib/server/admin/auth';
 import { expireUndecided } from '$lib/server/events/undecided';
+import { seoDescriptions, seoDescriptionInput } from '$lib/server/seo';
+import { fail } from '@sveltejs/kit';
 export const load = async (event: import('./$types').PageServerLoadEvent) => {
   const { db } = requireAdmin(event);
   await expireUndecided(db);
@@ -20,5 +22,19 @@ export const load = async (event: import('./$types').PageServerLoadEvent) => {
     counts: registrations.results,
     gatherings: gatherings?.total ?? 0,
     recipes: recipes?.total ?? 0,
+    seoDescriptions: await seoDescriptions(db),
   };
+};
+
+export const actions: import('./$types').Actions = {
+  seo: async (event) => {
+    const { db } = requireAdmin(event);
+    const input = seoDescriptionInput.safeParse(Object.fromEntries(await event.request.formData()));
+    if (!input.success) return fail(400, { seoError: true });
+    const { page, locale, description } = input.data;
+    await db.prepare(`INSERT INTO seo_metadata (page,locale,description) VALUES (?,?,?)
+      ON CONFLICT(page,locale) DO UPDATE SET description=excluded.description`)
+      .bind(page, locale, description).run();
+    return { seoSaved: true };
+  },
 };

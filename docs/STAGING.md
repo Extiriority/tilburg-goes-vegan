@@ -49,7 +49,11 @@ in shows the site. Bootstrap test gatherings and a staging organizer account
 before testing registration and admin workflows. Configure hosted sandbox mail
 before testing delivery. Keep the release workflow verification-only.
 
-If the Worker returns `key-fetch` after Access sign-in, staging can temporarily
+Access key retrieval uses `redirect: 'manual'` and rejects non-success responses.
+Workers does not implement `redirect: 'error'`. The staging deployment fetches
+live keys and no longer needs a key snapshot that expires after seven days.
+
+If an upstream outage causes `key-fetch` after Access sign-in, staging can temporarily
 use `ACCESS_KEY_SNAPSHOT` in its ignored Wrangler config. Set it to a JSON
 string containing `issuer`, `expires` (Unix milliseconds), and `keys` (the
 public JWK array fetched over HTTPS from the configured issuer’s

@@ -4,12 +4,13 @@ export const load = async ({ platform, params }: import('./$types').PageServerLo
   if (!platform?.env.DB) error(404, 'Recipe not found');
   const db = platform.env.DB;
   const recipe = await db
-    .prepare('SELECT title,description,category,chef_credit,id,notes,youtube_video_id,serving_grams,calories_kcal,servings,total_minutes,allergens FROM recipes WHERE slug=?')
+    .prepare('SELECT title,description,meta_description,category,chef_credit,id,notes,youtube_video_id,serving_grams,calories_kcal,servings,total_minutes,allergens FROM recipes WHERE slug=? AND published_at IS NOT NULL')
     .bind(params.slug)
     .first<{
       id: string;
       title: string;
       description: string | null;
+      meta_description: string | null;
       category: string;
       chef_credit: string | null;
       notes: string; youtube_video_id: string | null; serving_grams: number | null; calories_kcal: number | null; servings: number | null; total_minutes: number | null; allergens: string;

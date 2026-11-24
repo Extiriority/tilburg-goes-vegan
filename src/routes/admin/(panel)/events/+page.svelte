@@ -1,5 +1,6 @@
 <script lang="ts">
   import GatheringDateTime from '$lib/components/GatheringDateTime.svelte';
+  import PaymentPreview from '$lib/components/PaymentPreview.svelte';
   import { goto } from '$app/navigation';
   import { navigating } from '$app/state';
   import { getLocaleStore } from '$lib/locale-context';
@@ -11,6 +12,36 @@
   import { tick } from 'svelte';
   import type { SubmitFunction } from '@sveltejs/kit';
   let { data, form } = $props();
+  let paymentPreview: { open: () => void };
+  let budgetCopyStatus = $state('');
+  $effect(() => {
+    if (!budgetCopyStatus) return;
+    const timer = setTimeout(() => { budgetCopyStatus = ''; }, 3000);
+    return () => clearTimeout(timer);
+  });
+  async function copyBudget(budget: { starter: number; main: number; dessert: number }) {
+    const currency = new Intl.NumberFormat(nl ? 'nl-NL' : 'en-GB', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
+    const message = nl
+      ? `Het budget per gang is ${currency.format(budget.starter)} voor het voorgerecht, ${currency.format(budget.main)} voor het hoofdgerecht en ${currency.format(budget.dessert)} voor het nagerecht.`
+      : `The budget per course is ${currency.format(budget.starter)} for the starter, ${currency.format(budget.main)} for the main and ${currency.format(budget.dessert)} for dessert.`;
+    const reportedAllergens = allergens
+      .filter(item => data.dietaryAllergens.includes(item.id))
+      .map(item => nl ? item.nl : item.en);
+    const dietaryDetails = data.dietaryNotes.map(note => note.trim()).filter(Boolean);
+    const lines = [message];
+    if (reportedAllergens.length) {
+      lines.push(`${nl ? 'Allergieën/intoleranties' : 'Allergies/intolerances'}: ${reportedAllergens.join(', ')}.`);
+    }
+    if (dietaryDetails.length) {
+      lines.push(`${nl ? 'Dieetdetails' : 'Dietary details'}: ${dietaryDetails.join('; ')}`);
+    }
+    try {
+      await navigator.clipboard.writeText(lines.join('\n\n'));
+      budgetCopyStatus = nl ? 'Budget gekopieerd.' : 'Budget copied.';
+    } catch {
+      budgetCopyStatus = nl ? 'Kopiëren mislukt. Probeer opnieuw.' : 'Could not copy. Try again.';
+    }
+  }
   const locale = getLocaleStore();
   let creatingGathering = $state(false);
   let editingGathering = $state(false);
@@ -227,15 +258,15 @@
         class="gathering-count-chips"
         aria-label={nl ? 'Deelnemers en gangbudgetten' : 'Participants and course budgets'}
       >
-        <li class="gathering-count-chip count-primary" aria-label={nl ? `${gathering.confirmed} van ${gathering.capacity} plaatsen bezet` : `${gathering.confirmed} of ${gathering.capacity} seats filled`}>
+        <li><button type="button" class="gathering-count-chip count-primary" onclick={() => paymentPreview.open()} aria-haspopup="dialog" aria-label={nl ? `${gathering.confirmed} van ${gathering.capacity} plaatsen bezet. QR-betaling bekijken` : `${gathering.confirmed} of ${gathering.capacity} seats filled. View payment QR`}>
           <strong aria-hidden="true">{gathering.confirmed}<span> / {gathering.capacity}</span></strong>
-        </li>
-        <li
+        </button></li>
+        <li><button type="button" onclick={() => copyBudget(gathering.budget)}
           class="gathering-count-chip course-budget-chip"
           aria-label={nl
-            ? `Budget: voorgerecht €${gathering.budget.starter}, hoofdgerecht €${gathering.budget.main}, nagerecht €${gathering.budget.dessert}`
-            : `Budget: starter €${gathering.budget.starter}, main €${gathering.budget.main}, dessert €${gathering.budget.dessert}`}
-          title={nl ? 'Voorgerecht / hoofdgerecht / nagerecht' : 'Starter / main / dessert'}
+            ? `Budget: voorgerecht €${gathering.budget.starter}, hoofdgerecht €${gathering.budget.main}, nagerecht €${gathering.budget.dessert}. Kopiëren voor WhatsApp`
+            : `Budget: starter €${gathering.budget.starter}, main €${gathering.budget.main}, dessert €${gathering.budget.dessert}. Copy for WhatsApp`}
+          title={nl ? 'Budget kopiëren voor WhatsApp' : 'Copy budget for WhatsApp'}
         >
           <span aria-hidden="true"
             ><strong
@@ -243,7 +274,7 @@
                 .dessert}</strong
             ></span
           >
-        </li>
+        </button></li>
         {#each allergens.filter(item => data.dietaryAllergens.includes(item.id)) as item}<li class="gathering-dietary-control"><button type="button" class="gathering-count-chip admin-allergy-badge dietary-edit-chip" aria-expanded={editingDietary} aria-controls="gathering-dietary-editor" onclick={() => editingDietary = !editingDietary}><span class="allergen-icon" style={`--allergen-icon: url('${item.icon}')`} aria-hidden="true"></span><span class="gathering-chip-text">{item.id === 'gluten' ? 'Gluten' : nl ? item.nl : item.en}</span></button></li>{/each}
         {#if data.dietaryNotes.length}<li class="gathering-dietary-control"><button type="button" class="gathering-count-chip admin-allergy-badge dietary-edit-chip" aria-expanded={editingDietary} aria-controls="gathering-dietary-editor" onclick={() => editingDietary = !editingDietary}>{nl ? 'Overige dieetdetails' : 'Other dietary details'}</button></li>{/if}
         {#if !data.dietaryAllergens.length && !data.dietaryNotes.length}<li class="gathering-dietary-control"><button
@@ -490,3 +521,10 @@
 {:else}<p>
     {nl ? 'Voeg een bijeenkomst toe om te beginnen.' : 'Add a gathering to get started.'}
   </p>{/if}
+
+<PaymentPreview bind:this={paymentPreview} {nl} />
+<div role="status" aria-live="polite" class="budget-copy-feedback">{budgetCopyStatus}</div>
+
+<style>
+  .budget-copy-feedback:not(:empty) { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 100; max-width: calc(100vw - 32px); padding: 12px 20px; border-radius: 12px; background: #e0f2e4; color: #174a2a; box-shadow: 0 4px 16px rgb(0 0 0 / .15); }
+</style>

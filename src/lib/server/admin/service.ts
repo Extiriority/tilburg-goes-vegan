@@ -41,6 +41,7 @@ export const recipeEdit = z.object({
   slug: text(120).default(''),
   title: text(200).min(1),
   description: text(4000),
+  metaDescription: text(320).default(''),
   category: z.enum(['starter', 'main', 'dessert']),
   chefCredit: text(160),
   ingredients: text(12000).default(''),
@@ -372,7 +373,7 @@ export async function saveRecipe(
   const write = input.id
     ? db
         .prepare(
-          'UPDATE recipes SET slug=?,title=?,description=?,category=?,chef_credit=?,notes=?,youtube_video_id=?,serving_grams=?,calories_kcal=?,servings=?,total_minutes=?,allergens=?,version=version+1 WHERE id=? AND version=?',
+          'UPDATE recipes SET slug=?,title=?,description=?,category=?,chef_credit=?,notes=?,youtube_video_id=?,serving_grams=?,calories_kcal=?,servings=?,total_minutes=?,allergens=?,meta_description=?,version=version+1 WHERE id=? AND version=?',
         )
         .bind(
           slug,
@@ -381,12 +382,12 @@ export async function saveRecipe(
           input.category,
           input.chefCredit || null,
           JSON.stringify(structured?.notes ?? []), videoId, input.servingGrams, input.caloriesKcal, input.servings, input.totalMinutes, JSON.stringify(input.allergens),
-          recipeId,
+          input.metaDescription || null, recipeId,
           input.version,
         )
     : db
         .prepare(
-          'INSERT INTO recipes (id,slug,title,description,category,chef_credit,notes,youtube_video_id,serving_grams,calories_kcal,servings,total_minutes,allergens,created_at,published_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+          'INSERT INTO recipes (id,slug,title,description,category,chef_credit,notes,youtube_video_id,serving_grams,calories_kcal,servings,total_minutes,allergens,meta_description,created_at,published_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
         )
         .bind(
           recipeId,
@@ -396,7 +397,7 @@ export async function saveRecipe(
           input.category,
           input.chefCredit || null,
           JSON.stringify(structured?.notes ?? []), videoId, input.servingGrams, input.caloriesKcal, input.servings, input.totalMinutes, JSON.stringify(input.allergens),
-          now,
+          input.metaDescription || null, now,
           now,
         );
   await batch(db, [
